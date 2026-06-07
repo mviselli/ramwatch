@@ -16,20 +16,36 @@ The project is designed as a monitoring and diagnostic tool, not as an aggressiv
 
 ## Run
 ```bash
-mvn javafx:run
+mvn javafx:run -Dmaven.repo.local=.m2/repository
 ```
 
 ## Build
 ```bash
-mvn clean package
+mvn clean package -Dmaven.repo.local=.m2/repository
 ```
 
+## Test
+```bash
+# All tests
+mvn test -Dmaven.repo.local=.m2/repository
+
+# Single test class
+mvn test -Dtest=SystemSamplerTest -Dmaven.repo.local=.m2/repository
+```
+
+> The `-Dmaven.repo.local=.m2/repository` flag is required because the local Maven repository is stored inside the project directory rather than the default `~/.m2`.
+
 ## Project Structure
-- `src/main/java/com/ramwatch/system`: system sampling and OSHI integration
+- `src/main/java/com/ramwatch/system`: system sampling, OSHI integration, data models and formatting
 - `src/main/java/com/ramwatch/analysis`: thresholds, sorting, filtering and state analysis
 - `src/main/java/com/ramwatch/ui`: JavaFX screens and controls
 - `src/main/java/com/ramwatch/config`: user preferences and defaults
 - `src/main/java/com/ramwatch/storage`: local logs and future CSV export
 
 ## Current Status
-Phase 0 is complete: the repository has a Maven build, Java 21 target, JavaFX and OSHI dependencies, initial package structure, and a minimal JavaFX application shell.
+**Phase 0 — complete:** Maven build, Java 21 target, JavaFX and OSHI dependencies, package structure, minimal JavaFX shell.
+
+**Phase 1 — complete:** core monitoring layer.
+- `SystemSampler`: reads real RAM and process data from the OS via OSHI and produces a `SystemSnapshot` on each call.
+- `MemoryFormatter`: converts raw byte values to human-readable MB/GB strings and formats usage percentages.
+- `PollingService`: background thread (min 1 s interval, daemon) that calls `SystemSampler` at a fixed rate and delivers snapshots to a listener; shuts down cleanly on `stop()`.
