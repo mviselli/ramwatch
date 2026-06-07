@@ -16,24 +16,24 @@ The project is designed as a monitoring and diagnostic tool, not as an aggressiv
 
 ## Run
 ```bash
-mvn javafx:run -Dmaven.repo.local=.m2/repository
+mvn javafx:run
 ```
 
 ## Build
 ```bash
-mvn clean package -Dmaven.repo.local=.m2/repository
+mvn clean package
 ```
 
 ## Test
 ```bash
 # All tests
-mvn test -Dmaven.repo.local=.m2/repository
+mvn test
 
 # Single test class
-mvn test -Dtest=SystemSamplerTest -Dmaven.repo.local=.m2/repository
+mvn test -Dtest=SystemSamplerTest
 ```
 
-> The `-Dmaven.repo.local=.m2/repository` flag is required because the local Maven repository is stored inside the project directory rather than the default `~/.m2`.
+Maven is configured through `.mvn/maven.config` to store dependencies in `.m2/repository` inside this project. This avoids relying on the default `~/.m2` path.
 
 ## Project Structure
 - `src/main/java/com/ramwatch/system`: system sampling, OSHI integration, data models and formatting
