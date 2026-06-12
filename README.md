@@ -19,6 +19,9 @@ The project is designed as a monitoring and diagnostic tool, not as an aggressiv
 mvn javafx:run
 ```
 
+## Screenshot
+![RamWatch Dashboard](media/screen.png)
+
 ## Build
 ```bash
 mvn clean package
@@ -49,3 +52,13 @@ Maven is configured through `.mvn/maven.config` to store dependencies in `.m2/re
 - `SystemSampler`: reads real RAM and process data from the OS via OSHI and produces a `SystemSnapshot` on each call.
 - `MemoryFormatter`: converts raw byte values to human-readable MB/GB strings and formats usage percentages.
 - `PollingService`: background thread (min 1 s interval, daemon) that calls `SystemSampler` at a fixed rate and delivers snapshots to a listener; shuts down cleanly on `stop()`.
+
+**Phase 2 — complete:** analysis layer.
+- `RamState`: enum `STABLE | WARNING | CRITICAL`.
+- `AnalyzedSnapshot`: immutable record with `usedPercent`, `freePercent`, `topConsumers`, `state`, `sampledAt`; ready for direct UI consumption.
+- `MemoryAnalyzer`: computes percentages, determines state against configurable thresholds, sorts and filters processes by memory, supports name search. Factory `withDefaults()` (warning < 20% free, critical < 10% free, min 100 MB, top 10).
+
+**Phase 3 — complete:** GUI MVP.
+- `DashboardView`: JavaFX layout with RAM summary header (Total / Used / Free), coloured `ProgressBar` (green/yellow/red per state), `AreaChart` history, and sortable process `TableView`.
+- `RamChart`: circular buffer (`ArrayDeque`, max 300 samples) feeding a JavaFX `AreaChart`; no unbounded accumulation.
+- `DashboardController`: connects `PollingService` → `MemoryAnalyzer` → `DashboardView` via `Platform.runLater()`; starts with `controller.start(intervalSeconds)`, stops cleanly on window close.
