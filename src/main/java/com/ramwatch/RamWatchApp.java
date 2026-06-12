@@ -1,32 +1,29 @@
 package com.ramwatch;
 
+import com.ramwatch.ui.DashboardController;
+import com.ramwatch.ui.DashboardView;
 import javafx.application.Application;
-import javafx.geometry.Insets;
 import javafx.scene.Scene;
-import javafx.scene.control.Label;
-import javafx.scene.layout.BorderPane;
 import javafx.stage.Stage;
 
 public class RamWatchApp extends Application {
 
+    private DashboardController controller;
+
     @Override
     public void start(Stage stage) {
-        Label title = new Label("RamWatch");
-        title.setStyle("-fx-font-size: 24px; -fx-font-weight: bold;");
+        DashboardView view = new DashboardView();
+        controller = new DashboardController(view);
 
-        Label subtitle = new Label("Lightweight RAM monitoring utility");
-
-        BorderPane root = new BorderPane();
-        root.setPadding(new Insets(24));
-        root.setTop(title);
-        root.setCenter(subtitle);
-
-        Scene scene = new Scene(root, 720, 480);
+        Scene scene = new Scene(view, 720, 580);
         stage.setTitle("RamWatch");
         stage.setScene(scene);
         stage.setMinWidth(640);
-        stage.setMinHeight(420);
+        stage.setMinHeight(480);
+        stage.setOnCloseRequest(e -> controller.stop());
         stage.show();
+
+        controller.start(2);
     }
 
     public static void main(String[] args) {
