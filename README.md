@@ -20,7 +20,7 @@ mvn javafx:run
 ```
 
 ## Screenshot
-![RamWatch Dashboard](media/light_theme.png)
+![RamWatch Dashboard](media/dark_theme.png)
 
 ## Build
 ```bash
