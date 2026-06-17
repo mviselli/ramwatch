@@ -8,89 +8,121 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
-import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
 
 public final class DashboardView extends BorderPane {
 
-    // --- header ---
-    private final Label lblTotal = new Label();
-    private final Label lblUsed = new Label();
-    private final Label lblFree = new Label();
+    // header
+    private final Label lblTotal   = new Label();
+    private final Label lblUsed    = new Label();
+    private final Label lblFree    = new Label();
     private final Label lblPercent = new Label();
-    private final Label lblState = new Label();
+    private final Label lblState   = new Label();
     private final ProgressBar ramBar = new ProgressBar(0);
 
-    // --- grafico storico ---
+    // chart
     private final RamChart ramChart = new RamChart();
 
-    // --- tabella processi ---
+    // table
     private final TableView<ProcessSnapshot> processTable = new TableView<>();
+    private long currentTotalBytes = 1;
+
+    // theme
+    private boolean darkMode = false;
+    private Runnable themeToggleCallback;
+    private final Button themeBtn = new Button("☾  Dark");
 
     public DashboardView() {
         setPadding(new Insets(16));
-        setTop(buildHeader());
+        setTop(buildHeaderCard());
         setCenter(buildCenter());
     }
 
-    // --- aggiornamento pubblico ---
+    // ── public API ───────────────────────────────────────────
 
     public void update(AnalyzedSnapshot analyzed, long totalBytes, long usedBytes, long freeBytes) {
-        lblTotal.setText("Total:  " + MemoryFormatter.formatBytes(totalBytes));
-        lblUsed.setText("Used:   " + MemoryFormatter.formatBytes(usedBytes));
-        lblFree.setText("Free:   " + MemoryFormatter.formatBytes(freeBytes));
+        lblTotal.setText("Total  " + MemoryFormatter.formatBytes(totalBytes));
+        lblUsed.setText("Used  " + MemoryFormatter.formatBytes(usedBytes));
+        lblFree.setText("Free  " + MemoryFormatter.formatBytes(freeBytes));
         lblPercent.setText(analyzed.usedPercent() + "%");
 
         ramBar.setProgress(analyzed.usedPercent() / 100.0);
         applyStateStyle(analyzed.state());
 
+        currentTotalBytes = totalBytes > 0 ? totalBytes : 1;
         ramChart.addSample(analyzed.usedPercent());
         processTable.getItems().setAll(analyzed.topConsumers());
     }
 
-    // --- costruzione layout ---
+    public void setThemeToggleCallback(Runnable callback) {
+        this.themeToggleCallback = callback;
+    }
 
-    private VBox buildHeader() {
-        // titolo app
+    public boolean isDarkMode() {
+        return darkMode;
+    }
+
+    public void setDarkMode(boolean dark) {
+        this.darkMode = dark;
+        themeBtn.setText(dark ? "☀  Light" : "☾  Dark");
+    }
+
+    // ── layout ───────────────────────────────────────────────
+
+    private VBox buildHeaderCard() {
         Label title = new Label("RamWatch");
-        title.setFont(Font.font("System", FontWeight.BOLD, 20));
+        title.getStyleClass().add("label-app-title");
 
-        // metriche RAM
-        lblTotal.setStyle("-fx-font-size: 13px;");
-        lblUsed.setStyle("-fx-font-size: 13px;");
-        lblFree.setStyle("-fx-font-size: 13px;");
+        themeBtn.getStyleClass().add("theme-toggle");
+        themeBtn.setOnAction(e -> { if (themeToggleCallback != null) themeToggleCallback.run(); });
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        HBox titleRow = new HBox(title, spacer, themeBtn);
+        titleRow.setAlignment(Pos.CENTER_LEFT);
+
+        lblTotal.getStyleClass().add("label-metric");
+        lblUsed.getStyleClass().add("label-metric");
+        lblFree.getStyleClass().add("label-metric");
 
         HBox metrics = new HBox(24, lblTotal, lblUsed, lblFree);
         metrics.setAlignment(Pos.CENTER_LEFT);
 
-        // percentuale + stato
-        lblPercent.setFont(Font.font("System", FontWeight.BOLD, 15));
-        lblState.setFont(Font.font("System", FontWeight.BOLD, 13));
-        HBox statusRow = new HBox(12, lblPercent, lblState);
+        lblPercent.getStyleClass().add("label-percent");
+        HBox statusRow = new HBox(10, lblPercent, lblState);
         statusRow.setAlignment(Pos.CENTER_LEFT);
 
-        // barra RAM
         ramBar.setMaxWidth(Double.MAX_VALUE);
-        ramBar.setPrefHeight(14);
         HBox.setHgrow(ramBar, Priority.ALWAYS);
 
-        VBox header = new VBox(8, title, metrics, statusRow, ramBar);
-        header.setPadding(new Insets(0, 0, 16, 0));
-        return header;
+        VBox card = new VBox(10, titleRow, metrics, statusRow, ramBar);
+        card.getStyleClass().add("card");
+        BorderPane.setMargin(card, new Insets(0, 0, 16, 0));
+        return card;
     }
 
     private VBox buildCenter() {
-        VBox tableSection = buildTable();
-        VBox.setVgrow(tableSection, Priority.ALWAYS);
-        VBox center = new VBox(12, ramChart, tableSection);
+        VBox chartCard = buildChartCard();
+        VBox tableCard = buildTableCard();
+        VBox.setVgrow(tableCard, Priority.ALWAYS);
+
+        VBox center = new VBox(16, chartCard, tableCard);
         VBox.setVgrow(center, Priority.ALWAYS);
         return center;
     }
 
+    private VBox buildChartCard() {
+        Label title = new Label("RAM Usage History");
+        title.getStyleClass().add("section-title");
+
+        VBox card = new VBox(8, title, ramChart);
+        card.getStyleClass().add("card");
+        return card;
+    }
+
     @SuppressWarnings("unchecked")
-    private VBox buildTable() {
-        Label tableTitle = new Label("Top Processes");
-        tableTitle.setFont(Font.font("System", FontWeight.BOLD, 13));
+    private VBox buildTableCard() {
+        Label title = new Label("Top Processes");
+        title.getStyleClass().add("section-title");
 
         TableColumn<ProcessSnapshot, String> colName = new TableColumn<>("Process");
         colName.setCellValueFactory(cell ->
@@ -109,23 +141,38 @@ public final class DashboardView extends BorderPane {
                         MemoryFormatter.formatBytes(cell.getValue().usedMemoryBytes())));
         colMemory.setPrefWidth(100);
 
-        processTable.getColumns().addAll(colName, colPid, colMemory);
+        TableColumn<ProcessSnapshot, String> colPct = new TableColumn<>("%");
+        colPct.setCellValueFactory(cell -> {
+            double pct = cell.getValue().usedMemoryBytes() * 100.0 / currentTotalBytes;
+            return new javafx.beans.property.SimpleStringProperty(
+                    String.format("%.1f%%", pct));
+        });
+        colPct.setPrefWidth(60);
+
+        processTable.getColumns().addAll(colName, colPid, colMemory, colPct);
         processTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         processTable.setPlaceholder(new Label("No processes above threshold"));
         VBox.setVgrow(processTable, Priority.ALWAYS);
 
-        VBox tableSection = new VBox(8, tableTitle, processTable);
-        return tableSection;
+        VBox card = new VBox(8, title, processTable);
+        card.getStyleClass().add("card");
+        VBox.setVgrow(card, Priority.ALWAYS);
+        return card;
     }
 
+    // ── state styling ─────────────────────────────────────────
+
     private void applyStateStyle(RamState state) {
-        String color = switch (state) {
-            case STABLE -> "#4caf50";
-            case WARNING -> "#ff9800";
-            case CRITICAL -> "#f44336";
+        lblState.getStyleClass().removeAll("label-state-stable", "label-state-warning", "label-state-critical");
+        ramBar.getStyleClass().removeAll("stable", "warning", "critical");
+
+        String key = switch (state) {
+            case STABLE -> "stable";
+            case WARNING -> "warning";
+            case CRITICAL -> "critical";
         };
+        lblState.getStyleClass().add("label-state-" + key);
+        ramBar.getStyleClass().add(key);
         lblState.setText(state.name());
-        lblState.setStyle("-fx-font-size: 13px; -fx-font-weight: bold; -fx-text-fill: " + color + ";");
-        ramBar.setStyle("-fx-accent: " + color + ";");
     }
 }
