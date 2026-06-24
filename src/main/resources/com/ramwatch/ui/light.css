@@ -160,3 +160,18 @@
 .table-view .scroll-bar:vertical {
     -fx-background-color: transparent;
 }
+
+/* ── Dialog / Settings ────────────────────────────────────── */
+.dialog-pane {
+    -fx-background-color: #ffffff;
+}
+.dialog-pane .label {
+    -fx-text-fill: #1c1c1e;
+}
+.dialog-pane .check-box .text {
+    -fx-text-fill: #1c1c1e;
+}
+.dialog-pane .spinner .text-field {
+    -fx-text-fill: #1c1c1e;
+    -fx-background-color: #f2f2f7;
+}
