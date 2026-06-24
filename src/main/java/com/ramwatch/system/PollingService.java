@@ -13,6 +13,7 @@ public class PollingService {
     private final SystemSampler sampler;
     private final ScheduledExecutorService executor;
     private ScheduledFuture<?> task;
+    private Consumer<SystemSnapshot> currentListener;
 
     public PollingService(SystemSampler sampler) {
         this.sampler = sampler;
@@ -24,12 +25,13 @@ public class PollingService {
     }
 
     public void start(int intervalSeconds, Consumer<SystemSnapshot> listener) {
-        int interval = Math.max(intervalSeconds, MIN_INTERVAL_SECONDS);
-        task = executor.scheduleAtFixedRate(() -> {
-            try {
-                listener.accept(sampler.sample());
-            } catch (Exception ignored) {}
-        }, 0, interval, TimeUnit.SECONDS);
+        this.currentListener = listener;
+        schedule(intervalSeconds);
+    }
+
+    public void restart(int intervalSeconds) {
+        if (task != null) task.cancel(false);
+        schedule(intervalSeconds);
     }
 
     public void stop() {
@@ -37,5 +39,14 @@ public class PollingService {
             task.cancel(false);
         }
         executor.shutdown();
+    }
+
+    private void schedule(int intervalSeconds) {
+        int interval = Math.max(intervalSeconds, MIN_INTERVAL_SECONDS);
+        task = executor.scheduleAtFixedRate(() -> {
+            try {
+                currentListener.accept(sampler.sample());
+            } catch (Exception ignored) {}
+        }, 0, interval, TimeUnit.SECONDS);
     }
 }
