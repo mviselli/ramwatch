@@ -31,6 +31,10 @@ public final class DashboardView extends BorderPane {
     private Runnable themeToggleCallback;
     private final Button themeBtn = new Button("☾  Dark");
 
+    // settings
+    private Runnable settingsCallback;
+    private final Button settingsBtn = new Button("⚙  Settings");
+
     public DashboardView() {
         setPadding(new Insets(16));
         setTop(buildHeaderCard());
@@ -57,6 +61,10 @@ public final class DashboardView extends BorderPane {
         this.themeToggleCallback = callback;
     }
 
+    public void setSettingsCallback(Runnable callback) {
+        this.settingsCallback = callback;
+    }
+
     public boolean isDarkMode() {
         return darkMode;
     }
@@ -75,9 +83,12 @@ public final class DashboardView extends BorderPane {
         themeBtn.getStyleClass().add("theme-toggle");
         themeBtn.setOnAction(e -> { if (themeToggleCallback != null) themeToggleCallback.run(); });
 
+        settingsBtn.getStyleClass().add("theme-toggle");
+        settingsBtn.setOnAction(e -> { if (settingsCallback != null) settingsCallback.run(); });
+
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox titleRow = new HBox(title, spacer, themeBtn);
+        HBox titleRow = new HBox(8, title, spacer, themeBtn, settingsBtn);
         titleRow.setAlignment(Pos.CENTER_LEFT);
 
         lblTotal.getStyleClass().add("label-metric");
