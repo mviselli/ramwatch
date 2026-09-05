@@ -40,6 +40,10 @@ public final class DashboardView extends BorderPane {
     private Runnable settingsCallback;
     private final Button settingsBtn = new Button("⚙  Settings");
 
+    // csv export
+    private Runnable exportCallback;
+    private final Button exportBtn = new Button("⇩  Export CSV");
+
     public DashboardView() {
         setPadding(new Insets(16));
         setTop(buildTop());
@@ -104,6 +108,10 @@ public final class DashboardView extends BorderPane {
         this.settingsCallback = callback;
     }
 
+    public void setExportCallback(Runnable callback) {
+        this.exportCallback = callback;
+    }
+
     public boolean isDarkMode() {
         return darkMode;
     }
@@ -149,9 +157,12 @@ public final class DashboardView extends BorderPane {
         settingsBtn.getStyleClass().add("theme-toggle");
         settingsBtn.setOnAction(e -> { if (settingsCallback != null) settingsCallback.run(); });
 
+        exportBtn.getStyleClass().add("theme-toggle");
+        exportBtn.setOnAction(e -> { if (exportCallback != null) exportCallback.run(); });
+
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox titleRow = new HBox(8, title, spacer, themeBtn, settingsBtn);
+        HBox titleRow = new HBox(8, title, spacer, exportBtn, themeBtn, settingsBtn);
         titleRow.setAlignment(Pos.CENTER_LEFT);
 
         lblTotal.getStyleClass().add("label-metric");

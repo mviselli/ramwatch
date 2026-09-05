@@ -107,7 +107,10 @@ public final class EventLogger {
         Files.move(logFile, rotated, StandardCopyOption.REPLACE_EXISTING);
     }
 
-    /** One event, one line: pipe-separated fields that stay readable and easy to convert. */
+    /**
+     * One event, one line: pipe-separated fields that stay readable, closing with the
+     * raw byte counts so {@link EventLogReader} can recover exact values.
+     */
     static String format(MemoryEvent event) {
         StringBuilder sb = new StringBuilder(160);
         sb.append(TIMESTAMP.format(event.occurredAt()))
@@ -125,6 +128,12 @@ public final class EventLogger {
                     .append(" pid=").append(top.pid())
                     .append(" mem=").append(MemoryFormatter.formatBytes(top.usedMemoryBytes()));
         }
+
+        sb.append(" | bytes=").append(event.totalBytes())
+                .append(',').append(event.usedBytes())
+                .append(',').append(event.freeBytes())
+                .append(',').append(top == null ? "-" : String.valueOf(top.usedMemoryBytes()));
+
         return sb.append(System.lineSeparator()).toString();
     }
 }
