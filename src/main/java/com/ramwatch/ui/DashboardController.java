@@ -73,9 +73,14 @@ public final class DashboardController {
 
         // Threshold crossings only: a steady state must neither fill the log nor re-alert.
         boolean transitioned = stateTracker.accept(analyzed.state());
+        String logError = null;
         if (transitioned) {
-            eventLogger.log(MemoryEvent.from(analyzed, snapshot.memory()));
+            EventLogger logger = eventLogger;
+            if (!logger.log(MemoryEvent.from(analyzed, snapshot.memory())) && logger.isEnabled()) {
+                logError = describe(logger);
+            }
         }
+        String logErrorMessage = logError;
 
         long total = snapshot.memory().totalBytes();
         long used = snapshot.memory().usedBytes();
@@ -85,8 +90,19 @@ public final class DashboardController {
             view.update(analyzed, total, used, free);
             if (transitioned) {
                 view.onStateTransition(analyzed.state(), free);
+                if (logErrorMessage != null) {
+                    view.showLogError(logErrorMessage);
+                } else {
+                    view.clearLogError();
+                }
             }
         });
+    }
+
+    private static String describe(EventLogger logger) {
+        return logger.lastError()
+                .map(e -> logger.logFile() + " — " + e.getMessage())
+                .orElseGet(() -> logger.logFile().toString());
     }
 
     private static boolean thresholdsChanged(AppConfig a, AppConfig b) {

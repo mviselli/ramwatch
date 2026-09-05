@@ -73,6 +73,11 @@
     -fx-background-color: #48484a;
 }
 
+.label-log-error {
+    -fx-font-size: 12px;
+    -fx-text-fill: #ffd60a;
+}
+
 /* ── Alert banner ─────────────────────────────────────────── */
 .alert-banner {
     -fx-background-radius: 10;

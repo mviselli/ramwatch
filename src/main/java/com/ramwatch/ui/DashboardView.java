@@ -21,6 +21,7 @@ public final class DashboardView extends BorderPane {
 
     // alert banner
     private final Label lblAlert = new Label();
+    private final Label lblLogError = new Label("⚠  Log write failed");
     private final HBox alertBanner = buildAlertBanner();
 
     // chart
@@ -76,6 +77,18 @@ public final class DashboardView extends BorderPane {
                 + "free RAM down to " + MemoryFormatter.formatBytes(freeBytes) + ".");
         alertBanner.setVisible(true);
         alertBanner.setManaged(true);
+    }
+
+    /** Warns that the event log is unwritable; {@code detail} lands in the tooltip. */
+    public void showLogError(String detail) {
+        lblLogError.setTooltip(new Tooltip(detail));
+        lblLogError.setVisible(true);
+        lblLogError.setManaged(true);
+    }
+
+    public void clearLogError() {
+        lblLogError.setVisible(false);
+        lblLogError.setManaged(false);
     }
 
     public void hideAlert() {
@@ -149,7 +162,12 @@ public final class DashboardView extends BorderPane {
         metrics.setAlignment(Pos.CENTER_LEFT);
 
         lblPercent.getStyleClass().add("label-percent");
-        HBox statusRow = new HBox(10, lblPercent, lblState);
+
+        lblLogError.getStyleClass().add("label-log-error");
+        lblLogError.setVisible(false);
+        lblLogError.setManaged(false);
+
+        HBox statusRow = new HBox(10, lblPercent, lblState, lblLogError);
         statusRow.setAlignment(Pos.CENTER_LEFT);
 
         ramBar.setMaxWidth(Double.MAX_VALUE);
