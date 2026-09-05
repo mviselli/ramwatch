@@ -19,6 +19,10 @@ public final class DashboardView extends BorderPane {
     private final Label lblState   = new Label();
     private final ProgressBar ramBar = new ProgressBar(0);
 
+    // alert banner
+    private final Label lblAlert = new Label();
+    private final HBox alertBanner = buildAlertBanner();
+
     // chart
     private final RamChart ramChart = new RamChart();
 
@@ -37,7 +41,7 @@ public final class DashboardView extends BorderPane {
 
     public DashboardView() {
         setPadding(new Insets(16));
-        setTop(buildHeaderCard());
+        setTop(buildTop());
         setCenter(buildCenter());
     }
 
@@ -55,6 +59,28 @@ public final class DashboardView extends BorderPane {
         currentTotalBytes = totalBytes > 0 ? totalBytes : 1;
         ramChart.addSample(analyzed.usedPercent());
         processTable.getItems().setAll(analyzed.topConsumers());
+    }
+
+    /**
+     * Shows the alert banner for a threshold crossing, or hides it on recovery.
+     * Called on state transitions only, so a steady state never re-raises the alert.
+     */
+    public void onStateTransition(RamState state, long freeBytes) {
+        if (state == RamState.STABLE) {
+            hideAlert();
+            return;
+        }
+        alertBanner.getStyleClass().removeAll("alert-warning", "alert-critical");
+        alertBanner.getStyleClass().add(state == RamState.CRITICAL ? "alert-critical" : "alert-warning");
+        lblAlert.setText((state == RamState.CRITICAL ? "Critical: " : "Warning: ")
+                + "free RAM down to " + MemoryFormatter.formatBytes(freeBytes) + ".");
+        alertBanner.setVisible(true);
+        alertBanner.setManaged(true);
+    }
+
+    public void hideAlert() {
+        alertBanner.setVisible(false);
+        alertBanner.setManaged(false);
     }
 
     public void setThemeToggleCallback(Runnable callback) {
@@ -75,6 +101,30 @@ public final class DashboardView extends BorderPane {
     }
 
     // ── layout ───────────────────────────────────────────────
+
+    private VBox buildTop() {
+        VBox top = new VBox(12, buildHeaderCard(), alertBanner);
+        BorderPane.setMargin(top, new Insets(0, 0, 16, 0));
+        return top;
+    }
+
+    private HBox buildAlertBanner() {
+        lblAlert.getStyleClass().add("alert-text");
+
+        Button dismissBtn = new Button("✕");
+        dismissBtn.getStyleClass().add("alert-dismiss");
+        dismissBtn.setOnAction(e -> hideAlert());
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        HBox banner = new HBox(10, lblAlert, spacer, dismissBtn);
+        banner.setAlignment(Pos.CENTER_LEFT);
+        banner.getStyleClass().add("alert-banner");
+        banner.setVisible(false);
+        banner.setManaged(false);
+        return banner;
+    }
 
     private VBox buildHeaderCard() {
         Label title = new Label("RamWatch");
@@ -107,7 +157,6 @@ public final class DashboardView extends BorderPane {
 
         VBox card = new VBox(10, titleRow, metrics, statusRow, ramBar);
         card.getStyleClass().add("card");
-        BorderPane.setMargin(card, new Insets(0, 0, 16, 0));
         return card;
     }
 

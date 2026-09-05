@@ -73,6 +73,38 @@
     -fx-background-color: #48484a;
 }
 
+/* ── Alert banner ─────────────────────────────────────────── */
+.alert-banner {
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-padding: 10 14;
+}
+.alert-banner.alert-warning {
+    -fx-background-color: #3a3220;
+    -fx-border-color: #ffd60a;
+    -fx-border-width: 0 0 0 4;
+}
+.alert-banner.alert-critical {
+    -fx-background-color: #3d2422;
+    -fx-border-color: #ff453a;
+    -fx-border-width: 0 0 0 4;
+}
+.alert-text {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #f2f2f7;
+}
+.alert-dismiss {
+    -fx-background-color: transparent;
+    -fx-text-fill: #8e8e93;
+    -fx-font-size: 12px;
+    -fx-padding: 0 4;
+    -fx-cursor: hand;
+}
+.alert-dismiss:hover {
+    -fx-text-fill: #f2f2f7;
+}
+
 /* ── Chart ────────────────────────────────────────────────── */
 .chart {
     -fx-background-color: transparent;

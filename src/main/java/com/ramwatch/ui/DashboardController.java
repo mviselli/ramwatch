@@ -47,6 +47,8 @@ public final class DashboardController {
         // The tracker belongs to the polling thread, so let it do the reset itself.
         if (thresholdsChanged(previous, config)) {
             trackerResetPending = true;
+            // The banner was raised under the old thresholds; the next cycle re-judges.
+            view.hideAlert();
         }
         if (config.logFilePath().equals(previous.logFilePath())) {
             eventLogger.setEnabled(config.loggingEnabled());
@@ -69,8 +71,9 @@ public final class DashboardController {
 
         AnalyzedSnapshot analyzed = analyzer.analyze(snapshot);
 
-        // Threshold crossings only: a steady state must not fill the log.
-        if (stateTracker.accept(analyzed.state())) {
+        // Threshold crossings only: a steady state must neither fill the log nor re-alert.
+        boolean transitioned = stateTracker.accept(analyzed.state());
+        if (transitioned) {
             eventLogger.log(MemoryEvent.from(analyzed, snapshot.memory()));
         }
 
@@ -78,7 +81,12 @@ public final class DashboardController {
         long used = snapshot.memory().usedBytes();
         long free = snapshot.memory().availableBytes();
 
-        Platform.runLater(() -> view.update(analyzed, total, used, free));
+        Platform.runLater(() -> {
+            view.update(analyzed, total, used, free);
+            if (transitioned) {
+                view.onStateTransition(analyzed.state(), free);
+            }
+        });
     }
 
     private static boolean thresholdsChanged(AppConfig a, AppConfig b) {
