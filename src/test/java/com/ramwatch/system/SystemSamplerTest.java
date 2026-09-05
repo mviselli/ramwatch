@@ -7,6 +7,32 @@ import static org.junit.jupiter.api.Assertions.*;
 class SystemSamplerTest {
 
     @Test
+    void displayName_keepsAnInformativeName() {
+        assertEquals("Brave Browser Helper (Renderer)",
+                SystemSampler.displayName("Brave Browser Helper (Renderer)", "/Applications/Brave.app/x --type=renderer"));
+    }
+
+    @Test
+    void displayName_fallsBackToTheCommand_whenTheNameIsJustAVersion() {
+        assertEquals("claude", SystemSampler.displayName("2.1.261", "claude --resume"));
+        assertEquals("node", SystemSampler.displayName("18.20.4", "/usr/local/bin/node server.js"));
+    }
+
+    @Test
+    void displayName_keepsTheOriginal_whenTheCommandIsUnhelpful() {
+        assertEquals("2.1.261", SystemSampler.displayName("2.1.261", null));
+        assertEquals("2.1.261", SystemSampler.displayName("2.1.261", "   "));
+        assertEquals("2.1.261",
+                SystemSampler.displayName("2.1.261", "/Users/me/.local/share/claude/versions/2.1.261 --resume"));
+    }
+
+    @Test
+    void displayName_handlesAMissingName() {
+        assertEquals("claude", SystemSampler.displayName("", "claude --resume"));
+        assertEquals("unknown", SystemSampler.displayName(null, null));
+    }
+
+    @Test
     void sampleReturnsValidSnapshot() {
         SystemSampler sampler = new SystemSampler();
         SystemSnapshot snapshot = sampler.sample();
