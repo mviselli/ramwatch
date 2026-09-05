@@ -32,6 +32,7 @@ class ConfigStoreTest {
                 .criticalFreePercent(12.0)
                 .minProcessMemoryBytes(200L * 1024 * 1024)
                 .loggingEnabled(true)
+                .logFilePath(tmp.resolve("custom-events.log"))
                 .build();
 
         store.save(original);
@@ -61,6 +62,23 @@ class ConfigStoreTest {
         assertEquals(3, cfg.pollingIntervalSeconds());
         assertEquals(AppConfig.defaults().warningFreePercent(), cfg.warningFreePercent());
         assertEquals(AppConfig.defaults().criticalFreePercent(), cfg.criticalFreePercent());
+    }
+
+    @Test
+    void load_keepsCustomLogFilePath() throws IOException {
+        Path file = tmp.resolve("config.properties");
+        Path logFile = tmp.resolve("logs").resolve("custom.log");
+        Files.writeString(file, ConfigStore.KEY_LOG_FILE_PATH + "=" + logFile + "\n");
+
+        assertEquals(logFile, new ConfigStore(file).load().logFilePath());
+    }
+
+    @Test
+    void load_fallsBackToDefaultLogFilePath_whenValueUnusable() throws IOException {
+        Path file = tmp.resolve("config.properties");
+        Files.writeString(file, ConfigStore.KEY_LOG_FILE_PATH + "=   \n");
+
+        assertEquals(AppConfig.defaultLogFilePath(), new ConfigStore(file).load().logFilePath());
     }
 
     @Test

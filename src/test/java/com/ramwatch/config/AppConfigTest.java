@@ -2,6 +2,8 @@ package com.ramwatch.config;
 
 import org.junit.jupiter.api.Test;
 
+import java.nio.file.Path;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class AppConfigTest {
@@ -14,6 +16,14 @@ class AppConfigTest {
         assertEquals(10.0, cfg.criticalFreePercent());
         assertEquals(100L * 1024 * 1024, cfg.minProcessMemoryBytes());
         assertFalse(cfg.loggingEnabled());
+        assertEquals(AppConfig.defaultLogFilePath(), cfg.logFilePath());
+    }
+
+    @Test
+    void defaultLogFilePath_isEventsLogUnderRamwatchHome() {
+        Path path = AppConfig.defaultLogFilePath();
+        assertEquals("events.log", path.getFileName().toString());
+        assertEquals(".ramwatch", path.getParent().getFileName().toString());
     }
 
     @Test
@@ -24,6 +34,7 @@ class AppConfigTest {
                 .criticalFreePercent(15.0)
                 .minProcessMemoryBytes(50L * 1024 * 1024)
                 .loggingEnabled(true)
+                .logFilePath(Path.of("/var/log/ramwatch.log"))
                 .build();
 
         assertEquals(5, cfg.pollingIntervalSeconds());
@@ -31,6 +42,7 @@ class AppConfigTest {
         assertEquals(15.0, cfg.criticalFreePercent());
         assertEquals(50L * 1024 * 1024, cfg.minProcessMemoryBytes());
         assertTrue(cfg.loggingEnabled());
+        assertEquals(Path.of("/var/log/ramwatch.log"), cfg.logFilePath());
     }
 
     @Test
@@ -43,6 +55,15 @@ class AppConfigTest {
         assertEquals(original.criticalFreePercent(), modified.criticalFreePercent());
         assertEquals(original.minProcessMemoryBytes(), modified.minProcessMemoryBytes());
         assertEquals(original.loggingEnabled(), modified.loggingEnabled());
+        assertEquals(original.logFilePath(), modified.logFilePath());
+    }
+
+    @Test
+    void rejectsUnusableLogFilePath() {
+        assertThrows(NullPointerException.class, () ->
+                AppConfig.builder().logFilePath(null).build());
+        assertThrows(IllegalArgumentException.class, () ->
+                AppConfig.builder().logFilePath(Path.of("/")).build());
     }
 
     @Test

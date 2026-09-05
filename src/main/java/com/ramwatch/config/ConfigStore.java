@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.Properties;
 
@@ -18,6 +19,7 @@ public final class ConfigStore {
     static final String KEY_CRITICAL_FREE_PERCENT = "threshold.criticalFreePercent";
     static final String KEY_MIN_PROCESS_MEMORY_MB = "process.minMemoryMb";
     static final String KEY_LOGGING_ENABLED = "logging.enabled";
+    static final String KEY_LOG_FILE_PATH = "logging.filePath";
 
     private final Path configFile;
 
@@ -51,6 +53,7 @@ public final class ConfigStore {
         props.setProperty(KEY_CRITICAL_FREE_PERCENT, String.valueOf(config.criticalFreePercent()));
         props.setProperty(KEY_MIN_PROCESS_MEMORY_MB, String.valueOf(config.minProcessMemoryBytes() / (1024L * 1024)));
         props.setProperty(KEY_LOGGING_ENABLED, String.valueOf(config.loggingEnabled()));
+        props.setProperty(KEY_LOG_FILE_PATH, config.logFilePath().toString());
         try (OutputStream out = Files.newOutputStream(configFile)) {
             props.store(out, "RamWatch configuration");
         }
@@ -63,6 +66,7 @@ public final class ConfigStore {
                 .criticalFreePercent(parseDouble(props, KEY_CRITICAL_FREE_PERCENT, 10.0))
                 .minProcessMemoryBytes(parseLongMb(props, KEY_MIN_PROCESS_MEMORY_MB, 100L))
                 .loggingEnabled(parseBoolean(props, KEY_LOGGING_ENABLED, false))
+                .logFilePath(parsePath(props, KEY_LOG_FILE_PATH))
                 .build();
     }
 
@@ -82,6 +86,17 @@ public final class ConfigStore {
         String v = p.getProperty(key);
         if (v == null) return fallbackMb * 1024 * 1024;
         try { return Long.parseLong(v.strip()) * 1024 * 1024; } catch (NumberFormatException e) { return fallbackMb * 1024 * 1024; }
+    }
+
+    private static Path parsePath(Properties p, String key) {
+        String v = p.getProperty(key);
+        if (v == null || v.isBlank()) return AppConfig.defaultLogFilePath();
+        try {
+            Path path = Path.of(v.strip());
+            return path.getFileName() == null ? AppConfig.defaultLogFilePath() : path;
+        } catch (InvalidPathException e) {
+            return AppConfig.defaultLogFilePath();
+        }
     }
 
     private static boolean parseBoolean(Properties p, String key, boolean fallback) {

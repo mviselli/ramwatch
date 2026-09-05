@@ -49,16 +49,6 @@ public final class EventLogger {
         this.maxFileBytes = maxFileBytes;
     }
 
-    /** Logger writing to ~/.ramwatch/events.log. */
-    public static EventLogger atDefaultLocation(boolean enabled) {
-        return new EventLogger(defaultLogFile(), enabled);
-    }
-
-    public static Path defaultLogFile() {
-        Path home = Path.of(System.getProperty("user.home"));
-        return home.resolve(".ramwatch").resolve("events.log");
-    }
-
     public Path logFile() {
         return logFile;
     }

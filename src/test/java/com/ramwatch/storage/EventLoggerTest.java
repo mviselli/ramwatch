@@ -138,11 +138,4 @@ class EventLoggerTest {
         assertThrows(IllegalArgumentException.class,
                 () -> new EventLogger(tmp.resolve("events.log"), true, 0));
     }
-
-    @Test
-    void defaultLogFile_isUnderRamwatchHomeDirectory() {
-        Path path = EventLogger.defaultLogFile();
-        assertEquals("events.log", path.getFileName().toString());
-        assertEquals(".ramwatch", path.getParent().getFileName().toString());
-    }
 }

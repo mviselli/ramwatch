@@ -8,6 +8,8 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.stage.Window;
 
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.util.function.Consumer;
 
 /**
@@ -21,6 +23,7 @@ public final class SettingsView extends Dialog<AppConfig> {
     private final Spinner<Double>  spnCritical      = new Spinner<>(1.0, 99.0, 10.0, 1.0);
     private final Spinner<Integer> spnMinMemoryMb   = new Spinner<>(0, 4096, 100);
     private final CheckBox         chkLogging       = new CheckBox();
+    private final TextField        txtLogFile       = new TextField();
     private final Label            lblError         = new Label();
 
     private SettingsView(AppConfig current, Window owner, ObservableList<String> stylesheets) {
@@ -64,6 +67,10 @@ public final class SettingsView extends Dialog<AppConfig> {
 
         lblError.setStyle("-fx-text-fill: #ff3b30; -fx-font-size: 11px;");
 
+        txtLogFile.setPrefColumnCount(24);
+        // The log file only matters while logging is on.
+        txtLogFile.disableProperty().bind(chkLogging.selectedProperty().not());
+
         Label lblLogging = new Label("Enable logging");
         lblLogging.setStyle("-fx-font-size: 13px;");
 
@@ -82,6 +89,7 @@ public final class SettingsView extends Dialog<AppConfig> {
         HBox loggingRow = new HBox(8, chkLogging, lblLogging);
         loggingRow.setAlignment(Pos.CENTER_LEFT);
         grid.add(loggingRow, 0, row++, 2, 1);
+        addRow(grid, row++, "Log file", txtLogFile);
         grid.add(lblError, 0, row, 2, 1);
 
         return grid;
@@ -103,6 +111,7 @@ public final class SettingsView extends Dialog<AppConfig> {
         spnCritical.getValueFactory().setValue(cfg.criticalFreePercent());
         spnMinMemoryMb.getValueFactory().setValue((int) (cfg.minProcessMemoryBytes() / (1024L * 1024)));
         chkLogging.setSelected(cfg.loggingEnabled());
+        txtLogFile.setText(cfg.logFilePath().toString());
     }
 
     private String validate() {
@@ -111,6 +120,9 @@ public final class SettingsView extends Dialog<AppConfig> {
         double critical = spnCritical.getValue();
         if (critical >= warning) {
             return "Critical threshold must be lower than warning threshold.";
+        }
+        if (chkLogging.isSelected() && parseLogFile() == null) {
+            return "Log file must be a valid path to a file.";
         }
         return null;
     }
@@ -123,7 +135,27 @@ public final class SettingsView extends Dialog<AppConfig> {
                 .criticalFreePercent(spnCritical.getValue())
                 .minProcessMemoryBytes((long) spnMinMemoryMb.getValue() * 1024 * 1024)
                 .loggingEnabled(chkLogging.isSelected())
+                .logFilePath(logFilePathOrDefault())
                 .build();
+    }
+
+    /** The typed log file, or {@code null} when it is blank or not a usable file path. */
+    private Path parseLogFile() {
+        String raw = txtLogFile.getText();
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            Path path = Path.of(raw.strip());
+            return path.getFileName() == null ? null : path;
+        } catch (InvalidPathException e) {
+            return null;
+        }
+    }
+
+    private Path logFilePathOrDefault() {
+        Path path = parseLogFile();
+        return path != null ? path : AppConfig.defaultLogFilePath();
     }
 
     private void commitSpinners() {
