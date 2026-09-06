@@ -58,6 +58,11 @@
                 <version>0.0.8</version>
                 <configuration>
                     <mainClass>com.ramwatch.RamWatchApp</mainClass>
+                    <!-- Without a name of its own the app shows up as "java" in the macOS
+                         menu bar and dock; the flag is ignored on other platforms. -->
+                    <options>
+                        <option>-Xdock:name=RamWatch</option>
+                    </options>
                 </configuration>
             </plugin>
         </plugins>

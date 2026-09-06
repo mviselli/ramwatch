@@ -38,9 +38,15 @@
     -fx-padding: 20;
 }
 
+/* The header sits shallower than the other cards: its rows are short, so the
+   card's own padding is what would make it tall. */
+.header-card {
+    -fx-padding: 15 20 17 20;
+}
+
 /* ── Typography ───────────────────────────────────────────── */
 .label-app-title {
-    -fx-font-size: 21px;
+    -fx-font-size: 18px;
     -fx-font-weight: bold;
     -fx-text-fill: -text;
 }
@@ -51,58 +57,47 @@
     -fx-text-fill: -text-muted;
 }
 
-/* ── Gauge ────────────────────────────────────────────────── */
-.gauge-track {
-    -fx-fill: transparent;
-    -fx-stroke: -fill-subtle;
+/* ── Meter ────────────────────────────────────────────────── */
+.meter-track {
+    -fx-background-color: -fill-subtle;
+    -fx-background-radius: 5;
 }
-.gauge-progress {
-    -fx-fill: transparent;
-    -fx-stroke: -accent;
+.meter-fill {
+    -fx-background-color: -accent;
+    -fx-background-radius: 5;
 }
-.gauge-progress.stable   { -fx-stroke: -stable; }
-.gauge-progress.warning  { -fx-stroke: -warning; }
-.gauge-progress.critical { -fx-stroke: -critical; }
+.meter-fill.stable   { -fx-background-color: -stable; }
+.meter-fill.warning  { -fx-background-color: -warning; }
+.meter-fill.critical { -fx-background-color: -critical; }
 
-.gauge-caption {
+.meter-percent {
+    -fx-font-size: 27px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -text;
+}
+.meter-caption {
     -fx-font-size: 10px;
     -fx-font-weight: bold;
     -fx-text-fill: -text-muted;
 }
-.gauge-percent {
-    -fx-font-size: 34px;
-    -fx-font-weight: bold;
-    -fx-text-fill: -text;
-}
-.gauge-state {
+.meter-state {
     -fx-font-size: 10px;
     -fx-font-weight: bold;
     -fx-background-radius: 9;
     -fx-padding: 3 10;
 }
-.gauge-state.state-stable   { -fx-text-fill: -stable;   -fx-background-color: -stable-soft; }
-.gauge-state.state-warning  { -fx-text-fill: -warning;  -fx-background-color: -warning-soft; }
-.gauge-state.state-critical { -fx-text-fill: -critical; -fx-background-color: -critical-soft; }
+.meter-state.state-stable   { -fx-text-fill: -stable;   -fx-background-color: -stable-soft; }
+.meter-state.state-warning  { -fx-text-fill: -warning;  -fx-background-color: -warning-soft; }
+.meter-state.state-critical { -fx-text-fill: -critical; -fx-background-color: -critical-soft; }
 
-/* ── Figure panel ─────────────────────────────────────────── */
-.figure-panel {
-    -fx-background-color: -fill-subtle;
-    -fx-background-radius: 14;
-    -fx-padding: 4 18;
-}
-.figure-row {
-    -fx-padding: 10 0;
-}
-.figure-separator {
-    -fx-background-color: -separator;
-}
+/* ── Figures ──────────────────────────────────────────────── */
 .figure-caption {
-    -fx-font-size: 11px;
+    -fx-font-size: 10px;
     -fx-font-weight: bold;
     -fx-text-fill: -text-muted;
 }
 .figure-value {
-    -fx-font-size: 19px;
+    -fx-font-size: 16px;
     -fx-font-weight: bold;
     -fx-text-fill: -text;
 }
@@ -114,7 +109,7 @@
     -fx-border-color: transparent;
     -fx-font-size: 12px;
     -fx-text-fill: -text;
-    -fx-padding: 9 14;
+    -fx-padding: 7 14;
     -fx-cursor: hand;
 }
 .toolbar-button:hover {

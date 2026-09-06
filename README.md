@@ -47,6 +47,16 @@ mvn javafx:run
 mvn clean package
 ```
 
+## macOS app bundle
+
+Run from Maven, the app is just a JVM process: macOS labels it "java" and gives it a generic
+icon. Bundling it fixes both.
+
+```bash
+tools/package-mac.sh          # builds target/dist/RamWatch.app
+open target/dist/RamWatch.app
+```
+
 ## Test
 
 ```bash

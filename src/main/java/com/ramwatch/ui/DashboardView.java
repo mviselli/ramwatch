@@ -7,12 +7,14 @@ import com.ramwatch.system.ProcessSnapshot;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 
 import java.util.List;
 
 /**
- * The main screen: memory figures, usage gauge, history chart and process table.
+ * The main screen: memory figures, usage meter, history chart and process table.
  *
  * <p>The layout is built once in the constructor; {@link #update} then only changes the text
  * and the values of the existing nodes, so a polling cycle never recreates the scene graph.
@@ -32,6 +34,9 @@ import java.util.List;
  */
 public final class DashboardView extends BorderPane {
 
+    /** Edge of the app mark shown beside the title, in pixels. */
+    private static final double LOGO_SIZE = 26;
+
     // header
 
     /** Total physical memory, formatted; the value of its stat tile. */
@@ -43,8 +48,8 @@ public final class DashboardView extends BorderPane {
     /** Memory available, formatted; the value of its stat tile. */
     private final Label lblFree = new Label();
 
-    /** Ring gauge carrying the usage percentage and the current state. */
-    private final RamGauge gauge = new RamGauge();
+    /** Horizontal meter carrying the usage percentage and the current state. */
+    private final RamMeter meter = new RamMeter(buildFigures());
 
     // alert banner
 
@@ -139,7 +144,7 @@ public final class DashboardView extends BorderPane {
         lblUsed.setText(MemoryFormatter.formatBytes(usedBytes));
         lblFree.setText(MemoryFormatter.formatBytes(freeBytes));
 
-        gauge.update(analyzed.usedPercent(), analyzed.state());
+        meter.update(analyzed.usedPercent(), analyzed.state());
 
         currentTotalBytes = totalBytes > 0 ? totalBytes : 1;
         currentHeaviestProcessBytes = heaviestOf(analyzed.topConsumers());
@@ -250,8 +255,8 @@ public final class DashboardView extends BorderPane {
      * @return the assembled top container
      */
     private VBox buildTop() {
-        VBox top = new VBox(12, buildHeaderCard(), alertBanner);
-        BorderPane.setMargin(top, new Insets(0, 0, 16, 0));
+        VBox top = new VBox(10, buildHeaderCard(), alertBanner);
+        BorderPane.setMargin(top, new Insets(0, 0, 12, 0));
         return top;
     }
 
@@ -279,11 +284,12 @@ public final class DashboardView extends BorderPane {
     }
 
     /**
-     * Builds the header card: title, usage gauge, the memory figures and the toolbar.
+     * Builds the header card: the logo and title with the toolbar opposite, and the usage meter
+     * with the memory figures underneath.
      *
-     * <p>Three columns share one row: the gauge answers "how full is it", the panel next to it
-     * gives the three figures behind that number, and the buttons are stacked on the right so
-     * they occupy a column of their own instead of a strip above everything else.
+     * <p>The header used to be a row of three columns built around a ring gauge, which needed a
+     * square of space to show one number. Two shallow rows and a horizontal meter say the same
+     * thing in a fraction of the height, leaving the chart and the table the rest of the window.
      *
      * @return the assembled card
      */
@@ -296,102 +302,87 @@ public final class DashboardView extends BorderPane {
         lblLogError.setVisible(false);
         lblLogError.setManaged(false);
 
-        HBox titleRow = new HBox(10, title, lblLogError);
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        HBox titleRow = new HBox(9, buildLogo(), title, lblLogError, spacer, buildToolbar());
         titleRow.setAlignment(Pos.CENTER_LEFT);
 
-        VBox figures = buildFigurePanel();
-        HBox.setHgrow(figures, Priority.ALWAYS);
-
-        HBox readout = new HBox(16, gauge, figures, buildToolbar());
-        readout.setAlignment(Pos.CENTER_LEFT);
-
-        VBox card = new VBox(16, titleRow, readout);
-        card.getStyleClass().add("card");
+        VBox card = new VBox(14, titleRow, meter);
+        card.getStyleClass().addAll("card", "header-card");
         return card;
     }
 
     /**
-     * Builds the panel holding the three memory figures, one per row.
+     * Builds the small app mark shown before the title.
      *
-     * <p>They used to be three separate tiles, which spent most of their width on empty space:
-     * one panel with a row each says the same thing and leaves room for the gauge.
+     * <p>The image is decoded straight to its display size, so the header never holds the full
+     * icon in memory.
      *
-     * @return the assembled panel
+     * @return the logo view, or an empty one if the icon resource is missing
      */
-    private VBox buildFigurePanel() {
-        VBox panel = new VBox(0,
-                buildFigureRow("TOTAL", lblTotal),
-                buildSeparator(),
-                buildFigureRow("USED", lblUsed),
-                buildSeparator(),
-                buildFigureRow("FREE", lblFree));
-        panel.setAlignment(Pos.CENTER_LEFT);
-        panel.getStyleClass().add("figure-panel");
-        panel.setMaxWidth(Double.MAX_VALUE);
-        return panel;
+    private static ImageView buildLogo() {
+        ImageView view = new ImageView();
+        var url = DashboardView.class.getResource("/com/ramwatch/icon.png");
+        if (url != null) {
+            view.setImage(new Image(url.toExternalForm(), LOGO_SIZE, LOGO_SIZE, true, true));
+        }
+        view.setFitWidth(LOGO_SIZE);
+        view.setFitHeight(LOGO_SIZE);
+        return view;
     }
 
     /**
-     * Builds one figure row: the caption on the left, the value pushed to the right.
+     * Builds the three memory figures, laid out side by side for the meter's reading row.
+     *
+     * @return the assembled figures
+     */
+    private HBox buildFigures() {
+        HBox figures = new HBox(20,
+                buildFigure("USED", lblUsed),
+                buildFigure("FREE", lblFree),
+                buildFigure("TOTAL", lblTotal));
+        figures.setAlignment(Pos.BASELINE_LEFT);
+        return figures;
+    }
+
+    /**
+     * Builds one figure: its caption, then the value.
      *
      * @param caption the fixed heading, shown small and uppercase
      * @param value   the label carrying the figure; kept by the caller to update it
-     * @return the assembled row
+     * @return the assembled figure
      */
-    private static HBox buildFigureRow(String caption, Label value) {
+    private static HBox buildFigure(String caption, Label value) {
         Label lblCaption = new Label(caption);
         lblCaption.getStyleClass().add("figure-caption");
         value.getStyleClass().add("figure-value");
 
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-
-        HBox row = new HBox(12, lblCaption, spacer, value);
-        row.setAlignment(Pos.CENTER_LEFT);
-        row.getStyleClass().add("figure-row");
-        VBox.setVgrow(row, Priority.ALWAYS);
-        return row;
+        HBox figure = new HBox(6, lblCaption, value);
+        figure.setAlignment(Pos.BASELINE_LEFT);
+        return figure;
     }
 
     /**
-     * Builds a hairline between two figure rows.
+     * Builds the toolbar: export, theme and settings, side by side at the end of the title row.
      *
-     * @return a one-pixel region taking its colour from the stylesheet
+     * <p>They sit on the title's line because that line has width to spare, which keeps them from
+     * costing the header a row of its own.
+     *
+     * @return the assembled toolbar
      */
-    private static Region buildSeparator() {
-        Region line = new Region();
-        line.getStyleClass().add("figure-separator");
-        line.setMinHeight(1);
-        line.setPrefHeight(1);
-        line.setMaxHeight(1);
-        return line;
-    }
-
-    /**
-     * Builds the stacked toolbar: export, theme and settings, one under the other.
-     *
-     * <p>The buttons share the column's width so the stack reads as one block rather than three
-     * pills of different lengths.
-     *
-     * @return the assembled stack
-     */
-    private VBox buildToolbar() {
+    private HBox buildToolbar() {
         exportBtn.setOnAction(e -> { if (exportCallback != null) exportCallback.run(); });
         themeBtn.setOnAction(e -> { if (themeToggleCallback != null) themeToggleCallback.run(); });
         settingsBtn.setOnAction(e -> { if (settingsCallback != null) settingsCallback.run(); });
 
         for (Button button : new Button[] { exportBtn, themeBtn, settingsBtn }) {
             button.getStyleClass().add("toolbar-button");
-            button.setMaxWidth(Double.MAX_VALUE);
-            button.setAlignment(Pos.CENTER_LEFT);
-            VBox.setVgrow(button, Priority.ALWAYS);
         }
 
-        VBox stack = new VBox(8, exportBtn, themeBtn, settingsBtn);
-        stack.setAlignment(Pos.CENTER);
-        stack.setMinWidth(132);
-        stack.setPrefWidth(132);
-        return stack;
+        HBox toolbar = new HBox(8, exportBtn, themeBtn, settingsBtn);
+        toolbar.setAlignment(Pos.CENTER_RIGHT);
+        return toolbar;
     }
 
     /**

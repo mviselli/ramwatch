@@ -9,11 +9,15 @@ import com.ramwatch.storage.EventCsvExporter;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
+import javafx.scene.image.Image;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
+import javax.imageio.ImageIO;
+import java.awt.Taskbar;
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 
 /**
  * JavaFX entry point: builds the window and wires the pieces together.
@@ -34,6 +38,12 @@ public class RamWatchApp extends Application {
 
     /** Persists the user's preferences at the default location. */
     private ConfigStore configStore;
+
+    /** The name the app goes by, in the window title and in the desktop's own furniture. */
+    private static final String APP_NAME = "RamWatch";
+
+    /** The app icon, as a classpath resource. */
+    private static final String ICON_RESOURCE = "/com/ramwatch/icon.png";
 
     /** Instantiated by the JavaFX runtime, which then calls {@link #start(Stage)}. */
     public RamWatchApp() {}
@@ -81,7 +91,8 @@ public class RamWatchApp extends Application {
 
         view.setExportCallback(() -> exportCsv(stage));
 
-        stage.setTitle("RamWatch");
+        stage.setTitle(APP_NAME);
+        applyIcon(stage);
         stage.setScene(scene);
         stage.setMinWidth(720);
         stage.setMinHeight(620);
@@ -89,6 +100,21 @@ public class RamWatchApp extends Application {
         stage.show();
 
         controller.start();
+    }
+
+    /**
+     * Gives the window its icon, for the platforms that read it off the stage.
+     *
+     * <p>macOS is not one of them: it shows what the launcher gave the process, which
+     * {@link #brand()} deals with before the window exists.
+     *
+     * @param stage the primary stage
+     */
+    private void applyIcon(Stage stage) {
+        URL icon = getClass().getResource(ICON_RESOURCE);
+        if (icon != null) {
+            stage.getIcons().add(new Image(icon.toExternalForm()));
+        }
     }
 
     /**
@@ -165,6 +191,34 @@ public class RamWatchApp extends Application {
      * @param args command-line arguments, passed through to the JavaFX runtime
      */
     public static void main(String[] args) {
+        brand();
         launch(args);
+    }
+
+    /**
+     * Gives the process a name and a dock icon of its own, before any window exists.
+     *
+     * <p>Launched as a plain JVM, the app introduces itself to macOS as "java" and gets the
+     * generic icon that goes with it. The name and the icon are read once, when the desktop
+     * first hears about the process, so both have to be set before JavaFX starts — which is
+     * what this method is for and why it runs from {@code main} rather than {@code start}.
+     *
+     * <p>The steps are all best-effort: on a platform with no dock, or one that will not let a
+     * process rename itself, the app simply keeps the name it was given.
+     */
+    private static void brand() {
+        System.setProperty("apple.awt.application.name", APP_NAME);
+        System.setProperty("com.apple.mrj.application.apple.menu.about.name", APP_NAME);
+        try {
+            URL icon = RamWatchApp.class.getResource(ICON_RESOURCE);
+            if (icon != null && Taskbar.isTaskbarSupported()) {
+                Taskbar taskbar = Taskbar.getTaskbar();
+                if (taskbar.isSupported(Taskbar.Feature.ICON_IMAGE)) {
+                    taskbar.setIconImage(ImageIO.read(icon));
+                }
+            }
+        } catch (Exception ignored) {
+            // No dock to put an icon on, or the platform will not let us change it.
+        }
     }
 }
