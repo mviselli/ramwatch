@@ -35,27 +35,69 @@ The logging toggle is already part of the configuration model and UI, but event 
 - JDK 21 or newer
 - Maven 3.9 or newer
 
-## Run
-
-```bash
-mvn javafx:run
-```
-
 ## Build
 
 ```bash
 mvn clean package
 ```
 
-## macOS app bundle
+This produces `target/ramwatch-0.1.0-SNAPSHOT.jar` plus its runtime dependencies in
+`target/lib`. The jar's manifest names `com.ramwatch.Launcher` as the main class and lists
+`lib/` on its class path, so the build output is runnable as it stands.
 
-Run from Maven, the app is just a JVM process: macOS labels it "java" and gives it a generic
-icon. Bundling it fixes both.
+## Run
+
+During development:
+
+```bash
+mvn javafx:run
+```
+
+From the built jar, with no further arguments:
+
+```bash
+java -jar target/ramwatch-0.1.0-SNAPSHOT.jar
+```
+
+JavaFX is loaded from the class path rather than the module path, which is why the entry
+point is `Launcher` and not `RamWatchApp`: a main class extending `javafx.application.Application`
+refuses to start unless JavaFX is a named module. The trade-off is one warning at startup,
+`Unsupported JavaFX configuration: classes were loaded from 'unnamed module'`, which is
+cosmetic — it is the price of a jar that runs without a `--module-path` argument.
+
+Either way the process is a plain JVM, so macOS labels it "java" in the menu bar and the
+dock. The app bundle below is what gives it its own name and icon.
+
+## macOS app bundle
 
 ```bash
 tools/package-mac.sh          # builds target/dist/RamWatch.app
 open target/dist/RamWatch.app
 ```
+
+The script gathers the jar and its dependencies, renders the icon at every size macOS asks
+for, and calls `jpackage --type app-image`. The result is a self-contained `RamWatch.app`
+carrying its own Java runtime: it starts under the name RamWatch, with the RamWatch icon,
+and needs no JDK installed to run.
+
+### Cross-platform limits
+
+`jpackage` builds only for the platform it runs on: there is no cross-compilation. The
+script is macOS-only by construction — it calls `iconutil` and produces an `.app` — and the
+project has been packaged and tested on macOS on Apple Silicon only.
+
+The application code itself is portable. JavaFX and OSHI both cover Windows and Linux, and
+nothing outside `tools/package-mac.sh` is macOS-specific, so `mvn clean package` and
+`java -jar` are expected to work on the other two platforms; they have not been verified
+there. Packaging for Windows (`--type msi`, needs WiX) or Linux (`--type deb` or `rpm`)
+means running `jpackage` on those systems with an equivalent script and an icon in the
+native format (`.ico`, `.png`).
+
+One dependency detail matters when building elsewhere: the JavaFX artifacts are resolved
+with a platform classifier (`mac-aarch64` here). Maven picks the classifier from the build
+machine, so a build on Windows or Linux pulls the right natives without any change to
+`pom.xml` — but the contents of `target/lib`, and therefore any bundle made from it, are
+tied to the platform that built them.
 
 ## Test
 

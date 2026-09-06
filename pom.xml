@@ -15,6 +15,7 @@
         <maven.compiler.release>21</maven.compiler.release>
         <javafx.version>21.0.5</javafx.version>
         <oshi.version>6.6.5</oshi.version>
+        <slf4j.version>2.0.16</slf4j.version>
         <junit.version>5.11.4</junit.version>
     </properties>
 
@@ -28,6 +29,14 @@
             <groupId>com.github.oshi</groupId>
             <artifactId>oshi-core</artifactId>
             <version>${oshi.version}</version>
+        </dependency>
+        <!-- OSHI logs through SLF4J. Without a provider every run opens with three warning
+             lines about the missing one; this binding discards the records instead. -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-nop</artifactId>
+            <version>${slf4j.version}</version>
+            <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -51,6 +60,49 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.2</version>
+            </plugin>
+            <!-- The runtime dependencies, next to the jar, so that the manifest below can
+                 point at them and `java -jar` works with no further arguments. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.8.1</version>
+                <executions>
+                    <execution>
+                        <id>copy-runtime-dependencies</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>copy-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/lib</outputDirectory>
+                            <includeScope>runtime</includeScope>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.2</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <!-- Launcher, not RamWatchApp: a main class that extends
+                                 Application refuses to start unless JavaFX is on the module
+                                 path, and here it is an ordinary classpath jar. -->
+                            <mainClass>com.ramwatch.Launcher</mainClass>
+                            <addClasspath>true</addClasspath>
+                            <classpathPrefix>lib/</classpathPrefix>
+                        </manifest>
+                        <manifestEntries>
+                            <!-- JavaFX loads its native libraries through System::load, which
+                                 a JDK 24 or newer warns about unless native access is granted
+                                 up front. Older JDKs ignore the attribute. -->
+                            <Enable-Native-Access>ALL-UNNAMED</Enable-Native-Access>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.openjfx</groupId>
