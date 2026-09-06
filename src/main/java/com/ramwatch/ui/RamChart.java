@@ -58,7 +58,7 @@ public final class RamChart extends AreaChart<Number, Number> {
         setAnimated(false);
         setCreateSymbols(false);
         setTitle(null);
-        setPrefHeight(160);
+        setPrefHeight(132);
 
         getData().add(series);
     }

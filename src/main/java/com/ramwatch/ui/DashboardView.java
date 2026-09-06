@@ -34,23 +34,17 @@ public final class DashboardView extends BorderPane {
 
     // header
 
-    /** Total physical memory, formatted. */
-    private final Label lblTotal   = new Label();
+    /** Total physical memory, formatted; the value of its stat tile. */
+    private final Label lblTotal = new Label();
 
-    /** Memory in use, formatted. */
-    private final Label lblUsed    = new Label();
+    /** Memory in use, formatted; the value of its stat tile. */
+    private final Label lblUsed = new Label();
 
-    /** Memory available, formatted. */
-    private final Label lblFree    = new Label();
+    /** Memory available, formatted; the value of its stat tile. */
+    private final Label lblFree = new Label();
 
-    /** Usage percentage shown next to the state. */
-    private final Label lblPercent = new Label();
-
-    /** Current state, styled by the CSS class matching it. */
-    private final Label lblState   = new Label();
-
-    /** Usage gauge, coloured by state. */
-    private final ProgressBar ramBar = new ProgressBar(0);
+    /** Ring gauge carrying the usage percentage and the current state. */
+    private final RamGauge gauge = new RamGauge();
 
     // alert banner
 
@@ -76,13 +70,13 @@ public final class DashboardView extends BorderPane {
     /** Total memory of the latest cycle, used to compute each process's share; never zero. */
     private long currentTotalBytes = 1;
 
+    /** Memory of the heaviest process of the latest cycle, which the share bars scale to; never zero. */
+    private long currentHeaviestProcessBytes = 1;
+
     // refresh memo
 
     /** Total memory already written into {@link #lblTotal}; negative until the first cycle. */
     private long shownTotalBytes = -1;
-
-    /** State the styling currently reflects; {@code null} until the first cycle. */
-    private RamState shownState;
 
     /** Reused by {@link #showLogError} so a failure never builds a second tooltip. */
     private final Tooltip logErrorTooltip = new Tooltip();
@@ -140,16 +134,15 @@ public final class DashboardView extends BorderPane {
         // Physical memory does not change while the app runs, so this text is written once.
         if (totalBytes != shownTotalBytes) {
             shownTotalBytes = totalBytes;
-            lblTotal.setText("Total  " + MemoryFormatter.formatBytes(totalBytes));
+            lblTotal.setText(MemoryFormatter.formatBytes(totalBytes));
         }
-        lblUsed.setText("Used  " + MemoryFormatter.formatBytes(usedBytes));
-        lblFree.setText("Free  " + MemoryFormatter.formatBytes(freeBytes));
-        lblPercent.setText(analyzed.usedPercent() + "%");
+        lblUsed.setText(MemoryFormatter.formatBytes(usedBytes));
+        lblFree.setText(MemoryFormatter.formatBytes(freeBytes));
 
-        ramBar.setProgress(analyzed.usedPercent() / 100.0);
-        applyStateStyle(analyzed.state());
+        gauge.update(analyzed.usedPercent(), analyzed.state());
 
         currentTotalBytes = totalBytes > 0 ? totalBytes : 1;
+        currentHeaviestProcessBytes = heaviestOf(analyzed.topConsumers());
         ramChart.addSample(analyzed.usedPercent());
         refreshProcessRows(analyzed.topConsumers());
     }
@@ -286,7 +279,7 @@ public final class DashboardView extends BorderPane {
     }
 
     /**
-     * Builds the header card: title, toolbar buttons, memory figures and usage gauge.
+     * Builds the header card: title, toolbar buttons, usage gauge and the three stat tiles.
      *
      * @return the assembled card
      */
@@ -294,43 +287,63 @@ public final class DashboardView extends BorderPane {
         Label title = new Label("RamWatch");
         title.getStyleClass().add("label-app-title");
 
-        themeBtn.getStyleClass().add("theme-toggle");
+        themeBtn.getStyleClass().add("toolbar-button");
         themeBtn.setOnAction(e -> { if (themeToggleCallback != null) themeToggleCallback.run(); });
 
-        settingsBtn.getStyleClass().add("theme-toggle");
+        settingsBtn.getStyleClass().add("toolbar-button");
         settingsBtn.setOnAction(e -> { if (settingsCallback != null) settingsCallback.run(); });
 
-        exportBtn.getStyleClass().add("theme-toggle");
+        exportBtn.getStyleClass().add("toolbar-button");
         exportBtn.setOnAction(e -> { if (exportCallback != null) exportCallback.run(); });
-
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox titleRow = new HBox(8, title, spacer, exportBtn, themeBtn, settingsBtn);
-        titleRow.setAlignment(Pos.CENTER_LEFT);
-
-        lblTotal.getStyleClass().add("label-metric");
-        lblUsed.getStyleClass().add("label-metric");
-        lblFree.getStyleClass().add("label-metric");
-
-        HBox metrics = new HBox(24, lblTotal, lblUsed, lblFree);
-        metrics.setAlignment(Pos.CENTER_LEFT);
-
-        lblPercent.getStyleClass().add("label-percent");
 
         lblLogError.getStyleClass().add("label-log-error");
         lblLogError.setTooltip(logErrorTooltip);
         lblLogError.setVisible(false);
         lblLogError.setManaged(false);
 
-        HBox statusRow = new HBox(10, lblPercent, lblState, lblLogError);
-        statusRow.setAlignment(Pos.CENTER_LEFT);
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        HBox titleRow = new HBox(10, title, lblLogError, spacer, exportBtn, themeBtn, settingsBtn);
+        titleRow.setAlignment(Pos.CENTER_LEFT);
 
-        ramBar.setMaxWidth(Double.MAX_VALUE);
-        HBox.setHgrow(ramBar, Priority.ALWAYS);
+        // The tiles share the width left over by the gauge, so they stay even as it resizes.
+        HBox tiles = new HBox(12,
+                buildStatTile("TOTAL", lblTotal),
+                buildStatTile("USED", lblUsed),
+                buildStatTile("FREE", lblFree));
+        tiles.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(tiles, Priority.ALWAYS);
 
-        VBox card = new VBox(10, titleRow, metrics, statusRow, ramBar);
+        HBox readout = new HBox(24, gauge, tiles);
+        readout.setAlignment(Pos.CENTER_LEFT);
+
+        VBox card = new VBox(18, titleRow, readout);
         card.getStyleClass().add("card");
         return card;
+    }
+
+    /**
+     * Builds one stat tile: a caption above the figure it names.
+     *
+     * <p>The caption is fixed, the value label is the one {@link #update} writes into.
+     *
+     * @param caption the fixed heading, shown small and uppercase
+     * @param value   the label carrying the figure; kept by the caller to update it
+     * @return the assembled tile
+     */
+    private static VBox buildStatTile(String caption, Label value) {
+        Label lblCaption = new Label(caption);
+        lblCaption.getStyleClass().add("stat-caption");
+        value.getStyleClass().add("stat-value");
+
+        VBox tile = new VBox(3, lblCaption, value);
+        tile.getStyleClass().add("stat-tile");
+        // The tiles stretch to the gauge's height, so their content is centred rather than
+        // pinned to the top of a box far taller than the two lines it holds.
+        tile.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(tile, Priority.ALWAYS);
+        tile.setMaxWidth(Double.MAX_VALUE);
+        return tile;
     }
 
     /**
@@ -354,61 +367,86 @@ public final class DashboardView extends BorderPane {
      * @return the assembled card
      */
     private VBox buildChartCard() {
-        Label title = new Label("RAM Usage History");
+        Label title = new Label("RAM USAGE HISTORY");
         title.getStyleClass().add("section-title");
 
-        VBox card = new VBox(8, title, ramChart);
+        VBox card = new VBox(10, title, ramChart);
         card.getStyleClass().add("card");
         return card;
     }
 
     /**
-     * Builds the process table: name, PID, memory and share of the total.
+     * Builds the process table: name, PID, share of the total and memory used.
      *
      * <p>The share is computed per cell against the latest total rather than stored on the
-     * model, so {@link ProcessSnapshot} stays a plain reading with no display concerns.
+     * model, so {@link ProcessSnapshot} stays a plain reading with no display concerns. The
+     * share column takes the whole row as its value because {@link ProcessShareCell} needs the
+     * byte count, not a string already formatted for it.
      *
      * @return the assembled card
      */
     @SuppressWarnings("unchecked")
     private VBox buildTableCard() {
-        Label title = new Label("Top Processes");
+        Label title = new Label("TOP PROCESSES");
         title.getStyleClass().add("section-title");
 
         TableColumn<ProcessSnapshot, String> colName = new TableColumn<>("Process");
         colName.setCellValueFactory(cell ->
                 new javafx.beans.property.SimpleStringProperty(cell.getValue().name()));
-        colName.setPrefWidth(200);
+        colName.setCellFactory(col -> new ProcessNameCell());
+        colName.setPrefWidth(220);
 
         TableColumn<ProcessSnapshot, String> colPid = new TableColumn<>("PID");
         colPid.setCellValueFactory(cell ->
                 new javafx.beans.property.SimpleStringProperty(
                         String.valueOf(cell.getValue().pid())));
+        // Alignment is a layout concern, not a themed one, and JavaFX splits it in two: the
+        // inline style reaches the cells, the style class reaches the column header.
+        colPid.setStyle("-fx-alignment: CENTER-RIGHT;");
+        colPid.getStyleClass().add("numeric-column");
         colPid.setPrefWidth(70);
+
+        TableColumn<ProcessSnapshot, ProcessSnapshot> colShare = new TableColumn<>("Share");
+        colShare.setCellValueFactory(cell ->
+                new javafx.beans.property.SimpleObjectProperty<>(cell.getValue()));
+        colShare.setCellFactory(col ->
+                new ProcessShareCell(() -> currentTotalBytes, () -> currentHeaviestProcessBytes));
+        colShare.setSortable(false);
+        colShare.setPrefWidth(160);
 
         TableColumn<ProcessSnapshot, String> colMemory = new TableColumn<>("Memory");
         colMemory.setCellValueFactory(cell ->
                 new javafx.beans.property.SimpleStringProperty(
                         MemoryFormatter.formatBytes(cell.getValue().usedMemoryBytes())));
-        colMemory.setPrefWidth(100);
+        colMemory.setStyle("-fx-alignment: CENTER-RIGHT;");
+        colMemory.getStyleClass().add("numeric-column");
+        colMemory.setPrefWidth(90);
 
-        TableColumn<ProcessSnapshot, String> colPct = new TableColumn<>("%");
-        colPct.setCellValueFactory(cell -> {
-            double pct = cell.getValue().usedMemoryBytes() * 100.0 / currentTotalBytes;
-            return new javafx.beans.property.SimpleStringProperty(
-                    String.format("%.1f%%", pct));
-        });
-        colPct.setPrefWidth(60);
-
-        processTable.getColumns().addAll(colName, colPid, colMemory, colPct);
+        processTable.getColumns().addAll(colName, colPid, colShare, colMemory);
         processTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         processTable.setPlaceholder(new Label("No processes above threshold"));
+        processTable.setFixedCellSize(34);
         VBox.setVgrow(processTable, Priority.ALWAYS);
 
-        VBox card = new VBox(8, title, processTable);
+        VBox card = new VBox(10, title, processTable);
         card.getStyleClass().add("card");
         VBox.setVgrow(card, Priority.ALWAYS);
         return card;
+    }
+
+    /**
+     * The memory of the heaviest process of a cycle, which the share bars are scaled to.
+     *
+     * @param ranked the processes of the cycle, sorted by memory descending; must not be
+     *               {@code null}
+     * @return the memory of the first process, in bytes, or {@code 1} when the list is empty or
+     *         its heaviest process reports nothing, so callers can divide by it safely
+     */
+    private static long heaviestOf(List<ProcessSnapshot> ranked) {
+        if (ranked.isEmpty()) {
+            return 1;
+        }
+        return Math.max(1, ranked.get(0).usedMemoryBytes());
     }
 
     // ── table refresh ─────────────────────────────────────────
@@ -420,36 +458,5 @@ public final class DashboardView extends BorderPane {
      */
     private void refreshProcessRows(List<ProcessSnapshot> latest) {
         ProcessRowDiff.apply(processTable.getItems(), latest);
-    }
-
-    // ── state styling ─────────────────────────────────────────
-
-    /**
-     * Restyles the state label and the gauge for the given state.
-     *
-     * <p>A cycle that reports the state already applied returns at once: restyling identical
-     * nodes would only make the CSS engine repeat itself. Otherwise the previous state's
-     * classes are removed first, so the styles never stack up over successive cycles.
-     *
-     * @param state the state to reflect; must not be {@code null}
-     */
-    private void applyStateStyle(RamState state) {
-        // A steady state would otherwise re-run the CSS on two nodes at every cycle.
-        if (state == shownState) {
-            return;
-        }
-        shownState = state;
-
-        lblState.getStyleClass().removeAll("label-state-stable", "label-state-warning", "label-state-critical");
-        ramBar.getStyleClass().removeAll("stable", "warning", "critical");
-
-        String key = switch (state) {
-            case STABLE -> "stable";
-            case WARNING -> "warning";
-            case CRITICAL -> "critical";
-        };
-        lblState.getStyleClass().add("label-state-" + key);
-        ramBar.getStyleClass().add(key);
-        lblState.setText(state.name());
     }
 }

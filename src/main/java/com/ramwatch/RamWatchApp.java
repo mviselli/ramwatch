@@ -55,7 +55,7 @@ public class RamWatchApp extends Application {
         DashboardView view = new DashboardView();
         controller = new DashboardController(view, initialConfig);
 
-        Scene scene = new Scene(view, 720, 600);
+        Scene scene = new Scene(view, 860, 760);
 
         String lightCss = getClass().getResource("/com/ramwatch/ui/light.css").toExternalForm();
         String darkCss  = getClass().getResource("/com/ramwatch/ui/dark.css").toExternalForm();
@@ -83,8 +83,8 @@ public class RamWatchApp extends Application {
 
         stage.setTitle("RamWatch");
         stage.setScene(scene);
-        stage.setMinWidth(640);
-        stage.setMinHeight(500);
+        stage.setMinWidth(720);
+        stage.setMinHeight(620);
         stage.setOnCloseRequest(e -> controller.stop());
         stage.show();
 
