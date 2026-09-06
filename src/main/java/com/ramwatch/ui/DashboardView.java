@@ -9,11 +9,16 @@ import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 
+import java.util.List;
+
 /**
  * The main screen: memory figures, usage gauge, history chart and process table.
  *
  * <p>The layout is built once in the constructor; {@link #update} then only changes the text
  * and the values of the existing nodes, so a polling cycle never recreates the scene graph.
+ * The refresh goes further and skips the nodes whose appearance would not change at all: the
+ * process rows that {@link ProcessRowDiff} judges unchanged, the total memory that never
+ * moves, and the state styling while the state holds.
  * State is conveyed through CSS style classes rather than hardcoded colours, which is what
  * lets the light and dark stylesheets restyle the whole window on their own.
  *
@@ -71,6 +76,17 @@ public final class DashboardView extends BorderPane {
     /** Total memory of the latest cycle, used to compute each process's share; never zero. */
     private long currentTotalBytes = 1;
 
+    // refresh memo
+
+    /** Total memory already written into {@link #lblTotal}; negative until the first cycle. */
+    private long shownTotalBytes = -1;
+
+    /** State the styling currently reflects; {@code null} until the first cycle. */
+    private RamState shownState;
+
+    /** Reused by {@link #showLogError} so a failure never builds a second tooltip. */
+    private final Tooltip logErrorTooltip = new Tooltip();
+
     // theme
 
     /** Whether the dark stylesheet is the one applied. */
@@ -121,7 +137,11 @@ public final class DashboardView extends BorderPane {
      * @param freeBytes  memory available, in bytes
      */
     public void update(AnalyzedSnapshot analyzed, long totalBytes, long usedBytes, long freeBytes) {
-        lblTotal.setText("Total  " + MemoryFormatter.formatBytes(totalBytes));
+        // Physical memory does not change while the app runs, so this text is written once.
+        if (totalBytes != shownTotalBytes) {
+            shownTotalBytes = totalBytes;
+            lblTotal.setText("Total  " + MemoryFormatter.formatBytes(totalBytes));
+        }
         lblUsed.setText("Used  " + MemoryFormatter.formatBytes(usedBytes));
         lblFree.setText("Free  " + MemoryFormatter.formatBytes(freeBytes));
         lblPercent.setText(analyzed.usedPercent() + "%");
@@ -131,7 +151,7 @@ public final class DashboardView extends BorderPane {
 
         currentTotalBytes = totalBytes > 0 ? totalBytes : 1;
         ramChart.addSample(analyzed.usedPercent());
-        processTable.getItems().setAll(analyzed.topConsumers());
+        refreshProcessRows(analyzed.topConsumers());
     }
 
     /**
@@ -160,7 +180,7 @@ public final class DashboardView extends BorderPane {
      * @param detail the failing path and, when known, the reason it failed
      */
     public void showLogError(String detail) {
-        lblLogError.setTooltip(new Tooltip(detail));
+        logErrorTooltip.setText(detail);
         lblLogError.setVisible(true);
         lblLogError.setManaged(true);
     }
@@ -298,6 +318,7 @@ public final class DashboardView extends BorderPane {
         lblPercent.getStyleClass().add("label-percent");
 
         lblLogError.getStyleClass().add("label-log-error");
+        lblLogError.setTooltip(logErrorTooltip);
         lblLogError.setVisible(false);
         lblLogError.setManaged(false);
 
@@ -390,17 +411,35 @@ public final class DashboardView extends BorderPane {
         return card;
     }
 
+    // ── table refresh ─────────────────────────────────────────
+
+    /**
+     * Brings the process rows in line with the latest cycle, touching only what changed.
+     *
+     * @param latest the ranked processes of the latest cycle; must not be {@code null}
+     */
+    private void refreshProcessRows(List<ProcessSnapshot> latest) {
+        ProcessRowDiff.apply(processTable.getItems(), latest);
+    }
+
     // ── state styling ─────────────────────────────────────────
 
     /**
      * Restyles the state label and the gauge for the given state.
      *
-     * <p>The previous state's classes are removed first, so the styles never stack up over
-     * successive cycles.
+     * <p>A cycle that reports the state already applied returns at once: restyling identical
+     * nodes would only make the CSS engine repeat itself. Otherwise the previous state's
+     * classes are removed first, so the styles never stack up over successive cycles.
      *
      * @param state the state to reflect; must not be {@code null}
      */
     private void applyStateStyle(RamState state) {
+        // A steady state would otherwise re-run the CSS on two nodes at every cycle.
+        if (state == shownState) {
+            return;
+        }
+        shownState = state;
+
         lblState.getStyleClass().removeAll("label-state-stable", "label-state-warning", "label-state-critical");
         ramBar.getStyleClass().removeAll("stable", "warning", "critical");
 
