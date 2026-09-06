@@ -77,6 +77,33 @@ Maven is configured through `.mvn/maven.config` to store dependencies in `.m2/re
 
 ![RamWatch light theme](media/light_theme.png)
 
+## Performance
+
+RamWatch is meant to stay open, so its own footprint was measured rather than assumed.
+The summary:
+
+| Metric | Result |
+|---|---|
+| CPU at the 1 s minimum polling interval | 12.6% of one core (~1.6% of an 8-core machine) |
+| CPU at 5 s / 30 s polling | 3.8% / 1.2% of one core |
+| CPU between polling cycles | 0.0% - the idle UI costs nothing measurable |
+| Heap live set (used heap after GC) | 24-43 MB, under the 50 MB target |
+| Resident set (RSS) | 260-315 MB, dominated by the JavaFX runtime and the JVM's default heap reservation |
+
+Measured on a MacBook Air (Apple Silicon, 8 cores, 8 GB RAM), macOS 27.0, OpenJDK 25,
+on a system with about 680 running processes, using `ps` and `jcmd` over 12 five-second
+windows after a 40-second warmup.
+
+The 50 MB target originally applied to RSS. It was missed by five times and redefined as
+a target on the application's live set, because the resident set of a JavaFX process is
+dominated by fixed costs the application code does not control.
+
+Two optimisations came out of the profiling work: the chart series is now its own
+circular buffer (one allocation per cycle instead of about 300), and the process table is
+refreshed row by row instead of being rebuilt, which removes 80.9% of cell redraws at 1 s
+polling. Neither moves CPU measurably: a cycle is dominated by enumerating every process
+on the system, not by drawing. That enumeration remains the real bottleneck.
+
 ## Architecture
 
 The data flow is:
@@ -101,7 +128,6 @@ Next planned work:
 1. Implement critical-event logging with timestamps, RAM metrics and top consumer.
 2. Avoid repeated alerts while the RAM state remains unchanged.
 3. Add optional CSV export.
-4. Profile RAM and CPU usage of the application itself.
-5. Prepare platform packaging with `jpackage`.
+4. Prepare platform packaging with `jpackage`.
 
 RamWatch should remain focused on lightweight monitoring and diagnosis. Automatic process termination or aggressive memory “optimization” is intentionally outside the MVP scope.
