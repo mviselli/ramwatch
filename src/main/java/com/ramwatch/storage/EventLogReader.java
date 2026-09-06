@@ -18,15 +18,34 @@ import java.util.List;
  *
  * <p>Unparsable lines are skipped rather than failing the whole read: a truncated or
  * hand-edited log should still export whatever it holds.
+ *
+ * <p>This class is stateless and cannot be instantiated.
+ *
+ * @author Michele Viselli
+ * @since 1.0
  */
 public final class EventLogReader {
 
+    /** Marker introducing the trailing field holding the exact byte counts. */
     private static final String BYTES_MARKER = " | bytes=";
+
+    /** Separator between the readable fields of a log line. */
     private static final String SEPARATOR = " | ";
 
+    /** Utility class: not meant to be instantiated. */
     private EventLogReader() {}
 
-    /** Events in the file, oldest first; empty when the file does not exist. */
+    /**
+     * Reads every event the log holds.
+     *
+     * <p>A file that does not exist is not an error: it simply means nothing was ever logged.
+     *
+     * @param logFile the log file to read; must not be {@code null}
+     * @return events in the file, oldest first; empty when the file does not exist or holds
+     *         no parsable line
+     * @throws IOException          if the file exists but cannot be read
+     * @throws NullPointerException if {@code logFile} is {@code null}
+     */
     public static List<MemoryEvent> read(Path logFile) throws IOException {
         if (!Files.exists(logFile)) {
             return List.of();
@@ -42,7 +61,16 @@ public final class EventLogReader {
         return events;
     }
 
-    /** One log line, or {@code null} when it does not parse. */
+    /**
+     * Parses one log line.
+     *
+     * <p>Only the head of the line is split, and at most into six fields, so a process name
+     * containing the separator cannot shift the others. Exact sizes are taken from the
+     * trailing raw field rather than from the formatted ones, which are rounded.
+     *
+     * @param line the line to parse; may be {@code null} or blank
+     * @return the event, or {@code null} when the line does not parse
+     */
     static MemoryEvent parse(String line) {
         if (line == null || line.isBlank()) {
             return null;
@@ -75,7 +103,17 @@ public final class EventLogReader {
         }
     }
 
-    /** Parses {@code top=<name> pid=<pid> mem=<formatted>}, using the raw byte count. */
+    /**
+     * Parses {@code top=<name> pid=<pid> mem=<formatted>}, using the raw byte count.
+     *
+     * <p>The formatted {@code mem=} value is ignored on purpose: it is rounded for display,
+     * while {@code rawBytes} carries the exact figure.
+     *
+     * @param field    the {@code top=} field of the line
+     * @param rawBytes the process's exact memory from the trailing raw field, or {@code "-"}
+     *                 when no process was recorded
+     * @return the top consumer, or {@code null} when none was recorded or the field does not parse
+     */
     private static ProcessSnapshot parseTopConsumer(String field, String rawBytes) {
         String value = field.strip();
         if (!value.startsWith("top=")) {

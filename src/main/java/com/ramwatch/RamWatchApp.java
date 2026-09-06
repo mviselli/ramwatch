@@ -15,11 +15,38 @@ import javafx.stage.Stage;
 import java.io.File;
 import java.io.IOException;
 
+/**
+ * JavaFX entry point: builds the window and wires the pieces together.
+ *
+ * <p>This class owns the composition, not the behaviour. It loads the stored configuration,
+ * creates the view and its controller, registers what the toolbar buttons do — switch theme,
+ * open the settings, export the events — and starts polling once the stage is on screen.
+ *
+ * <p>Launch it with {@link #main(String[])}, or through {@code mvn javafx:run}.
+ *
+ * @author Michele Viselli
+ * @since 1.0
+ */
 public class RamWatchApp extends Application {
 
+    /** Drives the dashboard; created in {@link #start} and stopped when the window closes. */
     private DashboardController controller;
+
+    /** Persists the user's preferences at the default location. */
     private ConfigStore configStore;
 
+    /** Instantiated by the JavaFX runtime, which then calls {@link #start(Stage)}. */
+    public RamWatchApp() {}
+
+    /**
+     * Builds the window and starts monitoring.
+     *
+     * <p>Called by the JavaFX runtime on the application thread. Themes are two stylesheets
+     * swapped on the scene, and closing the window stops the polling thread so the JVM can
+     * exit cleanly.
+     *
+     * @param stage the primary stage supplied by the JavaFX runtime
+     */
     @Override
     public void start(Stage stage) {
         configStore = ConfigStore.atDefaultLocation();
@@ -64,7 +91,14 @@ public class RamWatchApp extends Application {
         controller.start();
     }
 
-    /** Asks where to save, then converts the recorded events into a CSV file. */
+    /**
+     * Asks where to save, then converts the recorded events into a CSV file.
+     *
+     * <p>The outcome is always reported: how many events were written, that there were none
+     * to write, or why the file could not be created. Cancelling the chooser does nothing.
+     *
+     * @param stage the window the file chooser and the dialogs belong to
+     */
     private void exportCsv(Stage stage) {
         FileChooser chooser = new FileChooser();
         chooser.setTitle("Export events as CSV");
@@ -87,14 +121,36 @@ public class RamWatchApp extends Application {
         }
     }
 
+    /**
+     * Shows an informational dialog.
+     *
+     * @param owner   the window the dialog belongs to
+     * @param message the text to show
+     */
     private static void info(Stage owner, String message) {
         show(owner, Alert.AlertType.INFORMATION, message);
     }
 
+    /**
+     * Shows an error dialog.
+     *
+     * @param owner   the window the dialog belongs to
+     * @param message the text to show
+     */
     private static void error(Stage owner, String message) {
         show(owner, Alert.AlertType.ERROR, message);
     }
 
+    /**
+     * Shows a modal dialog styled like the rest of the app and waits for it to close.
+     *
+     * <p>The owner's stylesheets are copied onto the dialog, otherwise it would ignore the
+     * current theme.
+     *
+     * @param owner   the window the dialog belongs to
+     * @param type    the kind of dialog to show
+     * @param message the text to show
+     */
     private static void show(Stage owner, Alert.AlertType type, String message) {
         Alert alert = new Alert(type, message);
         alert.initOwner(owner);
@@ -103,6 +159,11 @@ public class RamWatchApp extends Application {
         alert.showAndWait();
     }
 
+    /**
+     * Starts the application.
+     *
+     * @param args command-line arguments, passed through to the JavaFX runtime
+     */
     public static void main(String[] args) {
         launch(args);
     }
