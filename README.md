@@ -1,26 +1,38 @@
 # RamWatch
 
-RamWatch is a lightweight Java desktop utility for real-time RAM monitoring and process diagnostics.
+RamWatch is a lightweight Java desktop utility for real-time RAM monitoring and process
+diagnostics.
 
-It is designed as an observation and diagnostic tool, not as an aggressive RAM booster. The application shows current memory usage, identifies the processes using the most memory, and keeps polling controlled so that the monitor itself remains lightweight.
+![RamWatch dark theme](media/dark_theme.png)
 
-## Current status
+## The problem
 
-The monitoring dashboard MVP is implemented and working. The current version includes:
+When a machine starts swapping, the questions are always the same: how much memory is
+actually in use, which process is holding it, and was it already like this a minute ago.
+The tools that answer them tend to sit at two extremes. System monitors show everything at
+once and leave the reading to you. "RAM boosters" promise to fix the problem by freeing
+memory, which on a modern OS mostly means throwing away caches the system will rebuild.
 
-- real-time total, used and available RAM metrics;
-- used-memory percentage and `STABLE`, `WARNING` and `CRITICAL` states;
-- configurable polling interval with a minimum of one second;
-- process list sorted by memory usage;
-- configurable minimum process-memory filter;
-- top-process table with PID, memory and percentage of total RAM;
-- RAM usage history chart with a bounded 300-sample buffer;
+RamWatch takes the middle position: it answers those three questions and nothing else. It
+observes and diagnoses, and never acts on your processes — no killing, no "optimising".
+The one thing a monitor must not do is become the problem it is watching, so its own cost
+is a design constraint and a measured number rather than a claim (see
+[Performance](#performance)).
+
+## Features
+
+- total, used and available RAM, refreshed live, with the used percentage on a ring gauge;
+- `STABLE`, `WARNING` and `CRITICAL` states, from configurable free-memory thresholds;
+- top-process table with name, PID, memory and share of total RAM, sorted by consumption;
+- configurable minimum process size, so small processes stay out of the table;
+- RAM history chart over a bounded 300-sample buffer;
+- optional event log, written only when the state changes rather than on every cycle, so a
+  long session in the same state produces one line and not thousands;
+- CSV export of the log for spreadsheets;
+- configurable polling interval, never below one second;
+- settings dialog with validation, persisted to `~/.ramwatch/config.properties`;
 - light and dark themes;
-- settings dialog with validation;
-- persistent preferences loaded from `~/.ramwatch/config.properties`;
-- background polling with clean shutdown on application close.
-
-The logging toggle is already part of the configuration model and UI, but event logging and CSV export are still planned.
+- background polling with clean shutdown when the window closes.
 
 ## Tech stack
 
@@ -29,6 +41,7 @@ The logging toggle is already part of the configuration model and UI, but event 
 - OSHI 6.6.5
 - Maven
 - JUnit 5
+- `jpackage` for the macOS bundle
 
 ## Requirements
 
@@ -109,13 +122,16 @@ mvn test
 mvn test -Dtest=SystemSamplerTest
 ```
 
-The current test suite covers the system models, OSHI sampler, polling service, memory analysis, formatting and configuration persistence.
+The suite has 112 tests covering the system models, the OSHI sampler, the polling service,
+memory analysis and state tracking, the event log and CSV export, configuration persistence
+and the table-refresh logic. The tests that exercise OSHI need to write JNA's native library
+to a temporary directory, so they fail under a sandbox that forbids it.
 
 Maven is configured through `.mvn/maven.config` to store dependencies in `.m2/repository` inside this project. This avoids relying on the default `~/.m2` path.
 
 ## Screenshots
 
-![RamWatch dark theme](media/dark_theme.png)
+The same dashboard in its light theme:
 
 ![RamWatch light theme](media/light_theme.png)
 
@@ -148,28 +164,75 @@ on the system, not by drawing. That enumeration remains the real bottleneck.
 
 ## Architecture
 
-The data flow is:
+The data flow is one direction, one cycle at a time:
 
 ```text
 OSHI → system snapshots → analysis → JavaFX dashboard
+                                  ↘ storage (optional event log → CSV)
 ```
 
-## Project structure
+Each layer is a package with one responsibility, and the boundary between them is a set of
+immutable records — `MemorySnapshot`, `ProcessSnapshot`, `SystemSnapshot` — that describe a
+single polling cycle. Nothing downstream can change what was sampled, and nothing upstream
+needs to know who is reading it.
 
 - `src/main/java/com/ramwatch/system`: OSHI integration, sampling, immutable data models and formatting
 - `src/main/java/com/ramwatch/analysis`: thresholds, RAM states, process sorting and filtering
-- `src/main/java/com/ramwatch/ui`: JavaFX dashboard, chart, process table, themes and settings dialog
+- `src/main/java/com/ramwatch/ui`: JavaFX dashboard, gauge, chart, process table, themes and settings dialog
 - `src/main/java/com/ramwatch/config`: user preferences, defaults and persistence
-- `src/main/java/com/ramwatch/storage`: reserved for local event logs and CSV export
-- `src/test/java`: unit tests for the core, analysis and configuration layers
+- `src/main/java/com/ramwatch/storage`: event log, log reader and CSV export
+- `src/test/java`: 112 unit tests across the system, analysis, storage, configuration and UI-logic layers
+
+The separation is what makes the project testable without a display: the analysis, storage
+and configuration layers have no JavaFX on their side of the boundary, and even the one
+piece of genuinely UI-shaped logic — deciding which table rows changed enough to be worth
+redrawing — lives in `ProcessRowDiff`, a class that touches no scene graph and is unit
+tested on its own.
+
+## Design notes
+
+**Why JavaFX.** A desktop monitor needs a live chart, a sortable table and a theme that is
+not painful to write; JavaFX gives all three in the standard toolchain, with CSS styling
+that made the light and dark themes two stylesheets rather than two code paths. The cost is
+honest and documented: a JavaFX process carries a few hundred MB of resident set before the
+application does anything, which is why the memory target had to be restated on the live
+set.
+
+**Why OSHI.** Reading physical memory and per-process usage means native calls, and doing
+that by hand per platform is the whole project. OSHI wraps it behind one API, which keeps
+`SystemSampler` small enough that the only platform-specific code in the repository is the
+macOS packaging script.
+
+**Why controlled polling.** Sampling every process on the machine is the expensive
+operation — profiling showed it dominates every cycle — so the interval is a first-class
+setting with a hard floor of one second. The floor is enforced in `AppConfig`, not in the
+dialog: an invalid configuration cannot be constructed, whether it comes from the UI or
+from a hand-edited properties file.
+
+**Efficiency as a constraint, not an afterthought.** The history is a fixed 300-sample
+circular buffer that *is* the chart series, so a cycle allocates one point instead of
+rebuilding three hundred. The process table is refreshed row by row against what is on
+screen, with a one-megabyte visibility threshold taken from the way the values are
+formatted — a difference too small to change a single character is a difference not worth
+redrawing, and that removes about 80% of cell redraws at one-second polling. Logging is off
+by default and, when on, records state transitions rather than samples. None of this is
+assumed: the numbers, including the optimisations that turned out not to matter, are in the
+[Performance](#performance) section.
 
 ## Roadmap
 
-Next planned work:
+Possible future work, roughly in order of usefulness:
 
-1. Implement critical-event logging with timestamps, RAM metrics and top consumer.
-2. Avoid repeated alerts while the RAM state remains unchanged.
-3. Add optional CSV export.
-4. Prepare platform packaging with `jpackage`.
+1. Cut the cost of a cycle at its source, by not building an object for every one of the
+   machine's processes only to discard most of them in the filter. Profiling identified
+   this as the one change that could move the numbers.
+2. Windows and Linux packaging, with the equivalent of `tools/package-mac.sh` run on each
+   platform.
+3. A menu-bar/tray mode, so the app can stay open without a window.
+4. Per-process history, to tell a steady consumer from a leak.
+5. Configurable chart window, currently fixed at 300 samples.
 
-RamWatch should remain focused on lightweight monitoring and diagnosis. Automatic process termination or aggressive memory “optimization” is intentionally outside the MVP scope.
+RamWatch stays focused on lightweight monitoring and diagnosis. Automatic process
+termination and aggressive memory "optimisation" are deliberately out of scope: the first
+is a decision the user should make themselves, the second mostly discards caches the
+operating system is managing better than an application can.
