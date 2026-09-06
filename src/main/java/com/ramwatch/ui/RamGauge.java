@@ -18,7 +18,7 @@ import javafx.geometry.Pos;
  * come from the stylesheets, so the gauge follows the theme like every other node.
  *
  * <p>Everything is built once. {@link #update} only changes the sweep of one arc and the text of
- * two labels, and the state styling is reapplied only when the state actually changes, so a
+ * one label, and the state styling is reapplied only when the state actually changes, so a
  * polling cycle costs nothing beyond that.
  *
  * <p>Like every JavaFX node, it must only be touched on the application thread.
@@ -29,10 +29,10 @@ import javafx.geometry.Pos;
 final class RamGauge extends StackPane {
 
     /** Outer radius of the ring, in pixels. */
-    private static final double RADIUS = 58;
+    private static final double RADIUS = 76;
 
     /** Thickness of the ring, in pixels. */
-    private static final double THICKNESS = 13;
+    private static final double THICKNESS = 17;
 
     /** A full turn, in degrees; the sweep of a gauge reading 100%. */
     private static final double FULL_TURN = 360;
@@ -46,10 +46,13 @@ final class RamGauge extends StackPane {
     /** The filled part of the ring, swept clockwise from the top. */
     private final Arc progress = arc();
 
+    /** Fixed caption naming what the ring measures. */
+    private final Label lblCaption = new Label("IN USE");
+
     /** Usage percentage, at the centre of the ring. */
     private final Label lblPercent = new Label("0.0%");
 
-    /** Current state, under the percentage. */
+    /** Current state, shown as a tinted pill under the percentage. */
     private final Label lblState = new Label();
 
     /** State the styling reflects; {@code null} until the first update. */
@@ -63,10 +66,11 @@ final class RamGauge extends StackPane {
         progress.getStyleClass().add("gauge-progress");
         progress.setLength(0);
 
+        lblCaption.getStyleClass().add("gauge-caption");
         lblPercent.getStyleClass().add("gauge-percent");
         lblState.getStyleClass().add("gauge-state");
 
-        VBox readout = new VBox(0, lblPercent, lblState);
+        VBox readout = new VBox(1, lblCaption, lblPercent, lblState);
         readout.setAlignment(Pos.CENTER);
 
         setAlignment(Pos.CENTER);

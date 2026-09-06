@@ -279,7 +279,11 @@ public final class DashboardView extends BorderPane {
     }
 
     /**
-     * Builds the header card: title, toolbar buttons, usage gauge and the three stat tiles.
+     * Builds the header card: title, usage gauge, the memory figures and the toolbar.
+     *
+     * <p>Three columns share one row: the gauge answers "how full is it", the panel next to it
+     * gives the three figures behind that number, and the buttons are stacked on the right so
+     * they occupy a column of their own instead of a strip above everything else.
      *
      * @return the assembled card
      */
@@ -287,63 +291,107 @@ public final class DashboardView extends BorderPane {
         Label title = new Label("RamWatch");
         title.getStyleClass().add("label-app-title");
 
-        themeBtn.getStyleClass().add("toolbar-button");
-        themeBtn.setOnAction(e -> { if (themeToggleCallback != null) themeToggleCallback.run(); });
-
-        settingsBtn.getStyleClass().add("toolbar-button");
-        settingsBtn.setOnAction(e -> { if (settingsCallback != null) settingsCallback.run(); });
-
-        exportBtn.getStyleClass().add("toolbar-button");
-        exportBtn.setOnAction(e -> { if (exportCallback != null) exportCallback.run(); });
-
         lblLogError.getStyleClass().add("label-log-error");
         lblLogError.setTooltip(logErrorTooltip);
         lblLogError.setVisible(false);
         lblLogError.setManaged(false);
 
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox titleRow = new HBox(10, title, lblLogError, spacer, exportBtn, themeBtn, settingsBtn);
+        HBox titleRow = new HBox(10, title, lblLogError);
         titleRow.setAlignment(Pos.CENTER_LEFT);
 
-        // The tiles share the width left over by the gauge, so they stay even as it resizes.
-        HBox tiles = new HBox(12,
-                buildStatTile("TOTAL", lblTotal),
-                buildStatTile("USED", lblUsed),
-                buildStatTile("FREE", lblFree));
-        tiles.setAlignment(Pos.CENTER_LEFT);
-        HBox.setHgrow(tiles, Priority.ALWAYS);
+        VBox figures = buildFigurePanel();
+        HBox.setHgrow(figures, Priority.ALWAYS);
 
-        HBox readout = new HBox(24, gauge, tiles);
+        HBox readout = new HBox(16, gauge, figures, buildToolbar());
         readout.setAlignment(Pos.CENTER_LEFT);
 
-        VBox card = new VBox(18, titleRow, readout);
+        VBox card = new VBox(16, titleRow, readout);
         card.getStyleClass().add("card");
         return card;
     }
 
     /**
-     * Builds one stat tile: a caption above the figure it names.
+     * Builds the panel holding the three memory figures, one per row.
      *
-     * <p>The caption is fixed, the value label is the one {@link #update} writes into.
+     * <p>They used to be three separate tiles, which spent most of their width on empty space:
+     * one panel with a row each says the same thing and leaves room for the gauge.
+     *
+     * @return the assembled panel
+     */
+    private VBox buildFigurePanel() {
+        VBox panel = new VBox(0,
+                buildFigureRow("TOTAL", lblTotal),
+                buildSeparator(),
+                buildFigureRow("USED", lblUsed),
+                buildSeparator(),
+                buildFigureRow("FREE", lblFree));
+        panel.setAlignment(Pos.CENTER_LEFT);
+        panel.getStyleClass().add("figure-panel");
+        panel.setMaxWidth(Double.MAX_VALUE);
+        return panel;
+    }
+
+    /**
+     * Builds one figure row: the caption on the left, the value pushed to the right.
      *
      * @param caption the fixed heading, shown small and uppercase
      * @param value   the label carrying the figure; kept by the caller to update it
-     * @return the assembled tile
+     * @return the assembled row
      */
-    private static VBox buildStatTile(String caption, Label value) {
+    private static HBox buildFigureRow(String caption, Label value) {
         Label lblCaption = new Label(caption);
-        lblCaption.getStyleClass().add("stat-caption");
-        value.getStyleClass().add("stat-value");
+        lblCaption.getStyleClass().add("figure-caption");
+        value.getStyleClass().add("figure-value");
 
-        VBox tile = new VBox(3, lblCaption, value);
-        tile.getStyleClass().add("stat-tile");
-        // The tiles stretch to the gauge's height, so their content is centred rather than
-        // pinned to the top of a box far taller than the two lines it holds.
-        tile.setAlignment(Pos.CENTER_LEFT);
-        HBox.setHgrow(tile, Priority.ALWAYS);
-        tile.setMaxWidth(Double.MAX_VALUE);
-        return tile;
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        HBox row = new HBox(12, lblCaption, spacer, value);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.getStyleClass().add("figure-row");
+        VBox.setVgrow(row, Priority.ALWAYS);
+        return row;
+    }
+
+    /**
+     * Builds a hairline between two figure rows.
+     *
+     * @return a one-pixel region taking its colour from the stylesheet
+     */
+    private static Region buildSeparator() {
+        Region line = new Region();
+        line.getStyleClass().add("figure-separator");
+        line.setMinHeight(1);
+        line.setPrefHeight(1);
+        line.setMaxHeight(1);
+        return line;
+    }
+
+    /**
+     * Builds the stacked toolbar: export, theme and settings, one under the other.
+     *
+     * <p>The buttons share the column's width so the stack reads as one block rather than three
+     * pills of different lengths.
+     *
+     * @return the assembled stack
+     */
+    private VBox buildToolbar() {
+        exportBtn.setOnAction(e -> { if (exportCallback != null) exportCallback.run(); });
+        themeBtn.setOnAction(e -> { if (themeToggleCallback != null) themeToggleCallback.run(); });
+        settingsBtn.setOnAction(e -> { if (settingsCallback != null) settingsCallback.run(); });
+
+        for (Button button : new Button[] { exportBtn, themeBtn, settingsBtn }) {
+            button.getStyleClass().add("toolbar-button");
+            button.setMaxWidth(Double.MAX_VALUE);
+            button.setAlignment(Pos.CENTER_LEFT);
+            VBox.setVgrow(button, Priority.ALWAYS);
+        }
+
+        VBox stack = new VBox(8, exportBtn, themeBtn, settingsBtn);
+        stack.setAlignment(Pos.CENTER);
+        stack.setMinWidth(132);
+        stack.setPrefWidth(132);
+        return stack;
     }
 
     /**
